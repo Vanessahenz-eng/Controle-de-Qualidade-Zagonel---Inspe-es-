@@ -14,7 +14,35 @@ GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 SETORES = {
     'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste']},
     'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste']},
-    'Injecao': {'nome': 'Injeção',     'cor': '#7C3AED', 'colaboradores': {},                                           'campos_executor': ['Executor', 'Executor do teste'], 'meta_padrao': 15, 'metas_fixas': {'jocemar': 20, 'kaue': 18}},
+    'Injecao': {
+        'nome': 'Injeção', 'cor': '#7C3AED',
+        'campos_executor': ['Executor', 'Executor do teste'],
+        'colaboradores': {
+            # Turno 1 — 05:20 às 15:08 — meta 20
+            'Kaline':   20,
+            'Jocemar':  20,
+            'Patricia': 20,
+            # Turno 2 — 15:00 às 00:27 — meta 18
+            'Tatiana':  18,
+            'Andressa': 18,
+            'Kaue':     18,
+            # Turno 3 — 00:12 às 05:48 — meta 11
+            'Renata':   11,
+            'Raquel':   11,
+        },
+        # Mapeamento de nomes completos → nome curto
+        'nomes_map': {
+            'kaline':    'Kaline',
+            'jocemar':   'Jocemar',
+            'patricia':  'Patricia',
+            'tatiana':   'Tatiana',
+            'andressa':  'Andressa',
+            'kaue':      'Kaue',
+            'kau':       'Kaue',
+            'renata':    'Renata',
+            'raquel':    'Raquel',
+        },
+    },
 }
 
 def load_data():
@@ -71,19 +99,22 @@ def save_data(data):
 def norm_name(n, setor_key):
     if not n: return None
     s = str(n).strip()
-    for nome in SETORES[setor_key].get('colaboradores', {}):
+    setor = SETORES[setor_key]
+    # Para Injeção: usar mapa de nomes completos → nome curto
+    if setor_key == 'Injecao':
+        s_lower = s.lower().replace('ê','e').replace('á','a').replace('ã','a')
+        nomes_map = setor.get('nomes_map', {})
+        for chave, nome_curto in nomes_map.items():
+            if chave in s_lower:
+                return nome_curto
+        return None
+    # Para outros setores: verificar se nome do colaborador está na string
+    for nome in setor.get('colaboradores', {}):
         if nome.lower() in s.lower(): return nome
-    if setor_key == 'Injecao' and len(s) > 3: return s.title()
     return None
 
 def get_meta(nome, setor_key):
-    setor = SETORES[setor_key]
-    if setor_key == 'Injecao':
-        k = nome.lower().replace('ê','e')
-        for chave, meta in setor.get('metas_fixas', {}).items():
-            if chave in k: return meta
-        return setor.get('meta_padrao', 15)
-    return setor['colaboradores'].get(nome, 0)
+    return SETORES[setor_key]['colaboradores'].get(nome, 0)
 
 def parse_xlsx(file_bytes, setor_key):
     try: df = pd.read_excel(BytesIO(file_bytes))
