@@ -6,7 +6,7 @@ from io import BytesIO
 
 app = Flask(__name__)
 
-DATA_FILE    = os.environ.get('DATA_FILE', 'data.json')
+DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
@@ -49,7 +49,6 @@ def load_data():
 
 def save_data(data):
     try:
-        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, 'w') as f:
             json.dump(data, f, ensure_ascii=False, default=str)
     except: pass
@@ -147,12 +146,6 @@ def parse_xlsx(file_bytes, setor_key):
         })
     return data_key, colaboradores, None
 
-@app.route('/api/config')
-def api_config():
-    return jsonify({
-        'setores': {k: {'nome': v['nome'], 'cor': v['cor']} for k, v in SETORES.items()}
-    })
-
 @app.route('/api/data')
 def api_data():
     return jsonify(load_data())
@@ -212,11 +205,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .topbar p{font-size:11px;opacity:.85;margin-top:2px}
 .main{max-width:1200px;margin:0 auto;padding:1.5rem}
 .tabs{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
-.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);transition:.15s}
-.tab:hover{border-color:#94A3B8;color:var(--text)}
+.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted)}
 .tab.on{color:#fff;border-color:transparent}
-.tab[data-s="todos"].on{background:#334155}
-.tab[data-s="imp"].on{background:#05B15D}
+#t-todos.on{background:#334155}
+#t-b203.on{background:#2563EB}
+#t-b101.on{background:#059669}
+#t-inj.on{background:#7C3AED}
+#t-imp.on{background:#05B15D}
 .tab-imp{margin-left:auto}
 .pg{display:none}.pg.on{display:block}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1.5rem}
@@ -272,7 +267,6 @@ tr:nth-child(even) td{background:#FAFAFA}
 .msg.err{background:var(--red-bg);color:#991B1B}
 .del-btn{font-size:11px;color:var(--red);background:none;border:1px solid #FCA5A5;border-radius:4px;padding:3px 10px;cursor:pointer}
 .empty{text-align:center;padding:3rem;color:var(--muted);font-size:13px}
-.loading{text-align:center;padding:3rem;color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
@@ -281,16 +275,27 @@ tr:nth-child(even) td{background:#FAFAFA}
   <div id="topinfo" style="font-size:12px;opacity:.8">Carregando...</div>
 </div>
 <div class="main">
-  <div class="tabs" id="tabs">
-    <button class="tab on" data-s="todos" onclick="goTab('todos',this)">Todos os setores</button>
-    <button class="tab tab-imp" data-s="imp" onclick="goTab('imp',this)">&#8679; Importar</button>
+  <div class="tabs">
+    <button class="tab on" id="t-todos" onclick="goTab('todos','t-todos')">Todos os setores</button>
+    <button class="tab" id="t-b203" onclick="goTab('B2-03','t-b203')">Apoio B2-03</button>
+    <button class="tab" id="t-b101" onclick="goTab('B1-01','t-b101')">Apoio B1-01</button>
+    <button class="tab" id="t-inj" onclick="goTab('Injecao','t-inj')">Injeção</button>
+    <button class="tab tab-imp" id="t-imp" onclick="goTab('imp','t-imp')">&#8679; Importar</button>
   </div>
-  <div id="pg-todos" class="pg on"><div id="c-todos"><div class="loading">Carregando dados...</div></div></div>
+  <div id="pg-todos" class="pg on"><div id="c-todos"><div class="empty">Carregando dados...</div></div></div>
+  <div id="pg-B2-03" class="pg"><div id="c-B2-03"><div class="empty">Selecione uma data.</div></div></div>
+  <div id="pg-B1-01" class="pg"><div id="c-B1-01"><div class="empty">Selecione uma data.</div></div></div>
+  <div id="pg-Injecao" class="pg"><div id="c-Injecao"><div class="empty">Selecione uma data.</div></div></div>
   <div id="pg-imp" class="pg">
     <div class="upform">
       <h3>Importar planilha diária</h3>
-      <div class="fg"><label>Setor</label>
-        <select id="up-s"></select>
+      <div class="fg">
+        <label>Setor</label>
+        <select id="up-s">
+          <option value="B2-03">Apoio B2-03</option>
+          <option value="B1-01">Apoio B1-01</option>
+          <option value="Injecao">Injeção</option>
+        </select>
       </div>
       <div class="fg"><label>Arquivo .xlsx</label><input type="file" id="up-f" accept=".xlsx"></div>
       <div class="fg"><label>Senha</label><input type="password" id="up-k" placeholder="••••••••"></div>
@@ -300,280 +305,209 @@ tr:nth-child(even) td{background:#FAFAFA}
     <div id="days-list" style="margin-top:1.5rem"></div>
   </div>
 </div>
-
 <script>
-var DB = {}, CFG = {}, tab = 'todos';
+var DB = {};
+var CFG = {
+  'B2-03': {nome:'Apoio B2-03', cor:'#2563EB'},
+  'B1-01': {nome:'Apoio B1-01', cor:'#059669'},
+  'Injecao': {nome:'Injeção', cor:'#7C3AED'}
+};
 
-async function init() {
-  try {
-    var rc = await fetch('/api/config');
-    CFG = await rc.json();
-    var rd = await fetch('/api/data');
-    DB = await rd.json();
-
-    // Criar tabs dos setores dinamicamente
-    var tabsEl = document.getElementById('tabs');
-    var impTab = tabsEl.querySelector('.tab-imp');
-    Object.keys(CFG.setores).forEach(function(sk) {
-      var b = document.createElement('button');
-      b.className = 'tab';
-      b.setAttribute('data-s', sk);
-      b.textContent = CFG.setores[sk].nome;
-      b.style.setProperty('--sc', CFG.setores[sk].cor);
-      b.onclick = function() { goTab(sk, b); };
-      tabsEl.insertBefore(b, impTab);
-
-      // Criar página do setor
-      var pg = document.createElement('div');
-      pg.id = 'pg-' + sk;
-      pg.className = 'pg';
-      var inner = document.createElement('div');
-      inner.id = 'c-' + sk;
-      pg.appendChild(inner);
-      document.querySelector('.main').appendChild(pg);
-    });
-
-    // CSS dinâmico para tabs dos setores
-    var style = document.createElement('style');
-    Object.keys(CFG.setores).forEach(function(sk) {
-      style.textContent += '.tab[data-s="' + sk + '"].on { background: ' + CFG.setores[sk].cor + '; }';
-    });
-    document.head.appendChild(style);
-
-    // Preencher select de setores
-    var sel = document.getElementById('up-s');
-    Object.keys(CFG.setores).forEach(function(sk) {
-      var opt = document.createElement('option');
-      opt.value = sk;
-      opt.textContent = CFG.setores[sk].nome;
-      sel.appendChild(opt);
-    });
-
-    var n = Object.values(DB).reduce(function(a, s) { return a + Object.keys(s).length; }, 0);
-    document.getElementById('topinfo').textContent = n + ' dias registrados';
-    rTodos();
-  } catch(e) {
-    document.getElementById('topinfo').textContent = 'Erro ao carregar';
-    document.getElementById('c-todos').innerHTML = '<div class="empty">Erro ao carregar dados. Recarregue a página.</div>';
-  }
+function goTab(s, tid) {
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
+  document.getElementById(tid).classList.add('on');
+  document.querySelectorAll('.pg').forEach(function(x){x.classList.remove('on');});
+  document.getElementById('pg-'+s).classList.add('on');
+  if(s==='todos') rTodos();
+  else if(s==='imp') rDaysList();
+  else rSetor(s);
 }
 
-function goTab(s, b) {
-  tab = s;
-  document.querySelectorAll('.tab').forEach(function(x) { x.classList.remove('on'); });
-  b.classList.add('on');
-  document.querySelectorAll('.pg').forEach(function(x) { x.classList.remove('on'); });
-  document.getElementById('pg-' + s).classList.add('on');
-  if (s === 'todos') rTodos();
-  else if (s !== 'imp') rSetor(s);
-  else rDaysList();
-}
+function fD(k){var d=new Date(k+'T12:00:00');return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();}
+function fT(s){if(!s)return'—';var d=new Date(s);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function fDur(m){if(m==null||isNaN(m))return'—';var mi=Math.floor(m),s=Math.round((m-mi)*60);return mi+'min '+String(s).padStart(2,'0')+'s';}
+function cl(pct,tot){if(!tot)return'em';if(pct<85)return'no';if(pct<=100)return'at';return'sv';}
+function pillTxt(c){return c==='sv'?'&#9650; Superou':c==='at'?'&#9679; Atingiu a meta':c==='no'?'&#10005; Não atingiu':'— Sem dados';}
 
-function fD(k) {
-  var d = new Date(k + 'T12:00:00');
-  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-}
-function fT(s) {
-  if (!s) return '—';
-  var d = new Date(s);
-  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-}
-function fDur(m) {
-  if (m == null || isNaN(m)) return '—';
-  var mi = Math.floor(m), s = Math.round((m - mi) * 60);
-  return mi + 'min ' + String(s).padStart(2,'0') + 's';
-}
-function cl(pct, tot) {
-  if (!tot) return 'em';
-  if (pct < 85) return 'no';
-  if (pct <= 100) return 'at';
-  return 'sv';
-}
-function pillTxt(c) {
-  return c==='sv' ? '&#9650; Superou' : c==='at' ? '&#9679; Atingiu a meta' : c==='no' ? '&#10005; Não atingiu' : '— Sem dados';
-}
-
-function buildCard(nome, d) {
-  var tot = d.total || 0, meta = d.meta || 0, nc = d.nc || 0;
-  var pct = meta > 0 ? Math.round(tot / meta * 100) : 0;
-  var c = cl(pct, tot);
-  return '<div class="card ' + c + '">' +
-    '<div class="cn">' + nome + '</div>' +
-    '<div class="cm">Meta: ' + meta + ' inspeções/dia</div>' +
-    '<div class="cpct">' + (!tot ? '—' : pct + '%') + '</div>' +
-    '<div class="csub">' + (!tot ? 'Sem registros' : tot + ' realizadas · meta ' + meta) + '</div>' +
-    '<div class="bar"><div class="bar-f" style="width:' + (!tot ? 0 : Math.min(pct,100)) + '%"></div></div>' +
-    '<div class="cst">' +
-      '<div><div class="csv2">' + tot + '</div><div class="csl">realizadas</div></div>' +
-      '<div><div class="csv2">' + (tot-nc) + '</div><div class="csl">conformes</div></div>' +
-      '<div><div class="csv2">' + meta + '</div><div class="csl">meta</div></div>' +
-    '</div>' +
-    '<span class="pill">' + pillTxt(c) + '</span>' +
+function buildCard(nome,d){
+  var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
+  var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
+  return '<div class="card '+c+'">' +
+    '<div class="cn">'+nome+'</div><div class="cm">Meta: '+meta+' inspeções/dia</div>' +
+    '<div class="cpct">'+(!tot?'—':pct+'%')+'</div>' +
+    '<div class="csub">'+(!tot?'Sem registros':tot+' realizadas · meta '+meta)+'</div>' +
+    '<div class="bar"><div class="bar-f" style="width:'+(!tot?0:Math.min(pct,100))+'%"></div></div>' +
+    '<div class="cst"><div><div class="csv2">'+tot+'</div><div class="csl">realizadas</div></div>' +
+    '<div><div class="csv2">'+(tot-nc)+'</div><div class="csl">conformes</div></div>' +
+    '<div><div class="csv2">'+meta+'</div><div class="csl">meta</div></div></div>' +
+    '<span class="pill">'+pillTxt(c)+'</span>' +
     '<div class="ncr"><span style="color:var(--muted)">NCs evidenciadas</span>' +
-      '<span class="' + (nc>0?'ncb':'ncg') + '">' + nc + ' NC' + (nc!==1?'s':'') + '</span></div>' +
-    '</div>';
+    '<span class="'+(nc>0?'ncb':'ncg')+'">'+nc+' NC'+(nc!==1?'s':'')+'</span></div></div>';
 }
 
-function buildSetor(sk, dk) {
-  var sd = (DB[sk] || {})[dk] || {};
-  var col = Object.entries(sd);
-  var nome_setor = CFG.setores[sk] ? CFG.setores[sk].nome : sk;
-  var cor = CFG.setores[sk] ? CFG.setores[sk].cor : '#334155';
-  if (!col.length) return '<div class="empty">Sem dados para ' + nome_setor + ' neste dia.</div>';
-  var tot = col.reduce(function(a,x){return a+x[1].total;},0);
-  var meta = col.filter(function(x){return x[1].total>0;}).reduce(function(a,x){return a+x[1].meta;},0);
-  var nc = col.reduce(function(a,x){return a+x[1].nc;},0);
-  var pct = meta > 0 ? Math.round(tot/meta*100) : 0;
+function buildSetor(sk,dk){
+  var sd=(DB[sk]||{})[dk]||{};
+  var col=Object.entries(sd);
+  var nome_setor=CFG[sk]?CFG[sk].nome:sk;
+  var cor=CFG[sk]?CFG[sk].cor:'#334155';
+  if(!col.length)return'<div class="empty">Sem dados para '+nome_setor+' neste dia.</div>';
+  var tot=col.reduce(function(a,x){return a+x[1].total;},0);
+  var meta=col.filter(function(x){return x[1].total>0;}).reduce(function(a,x){return a+x[1].meta;},0);
+  var nc=col.reduce(function(a,x){return a+x[1].nc;},0);
+  var pct=meta>0?Math.round(tot/meta*100):0;
   var nsv=0,nat=0,nno=0;
-  col.forEach(function(x) {
-    if (!x[1].total) return;
-    var p = Math.round(x[1].total/x[1].meta*100);
-    var c = cl(p, x[1].total);
-    if (c==='sv') nsv++; else if (c==='at') nat++; else nno++;
-  });
-  var h = '<div class="sec-block">' +
-    '<div class="sec-hdr">' +
-      '<div class="sec-dot" style="background:' + cor + '"></div>' +
-      '<div class="sec-title">' + nome_setor + '</div>' +
-      '<div class="sec-sub">' + tot + ' insp · ' + pct + '% meta · ' + nc + ' NC' + (nc!==1?'s':'') + '</div>' +
-    '</div>' +
+  col.forEach(function(x){if(!x[1].total)return;var p=Math.round(x[1].total/x[1].meta*100),c=cl(p,x[1].total);if(c==='sv')nsv++;else if(c==='at')nat++;else nno++;});
+  var h='<div class="sec-block"><div class="sec-hdr">' +
+    '<div class="sec-dot" style="background:'+cor+'"></div>' +
+    '<div class="sec-title">'+nome_setor+'</div>' +
+    '<div class="sec-sub">'+tot+' insp · '+pct+'% meta · '+nc+' NC'+(nc!==1?'s':'')+'</div></div>' +
     '<div class="kgrid">' +
-      '<div class="kcard"><div class="kl">Inspeções</div><div class="kv">' + tot + '</div><div class="ks">meta: ' + meta + '</div></div>' +
-      '<div class="kcard"><div class="kl">% da meta</div><div class="kv" style="color:' + (pct>=100?'var(--green)':pct>=85?'var(--amber)':'var(--red)') + '">' + pct + '%</div></div>' +
-      '<div class="kcard"><div class="kl">Status</div><div class="kv" style="font-size:13px;line-height:1.8">' +
-        (nsv>0?'<span style="color:var(--green)">&#9650; '+nsv+' superou</span><br>':'') +
-        (nat>0?'<span style="color:var(--amber)">&#9679; '+nat+' atingiu</span><br>':'') +
-        (nno>0?'<span style="color:var(--red)">&#10005; '+nno+' abaixo</span>':'') +
-      '</div></div>' +
-    '</div>' +
-    '<div class="cgrid">';
-  col.forEach(function(x) { h += buildCard(x[0], x[1]); });
-  h += '</div></div>';
+    '<div class="kcard"><div class="kl">Inspeções</div><div class="kv">'+tot+'</div><div class="ks">meta: '+meta+'</div></div>' +
+    '<div class="kcard"><div class="kl">% da meta</div><div class="kv" style="color:'+(pct>=100?'var(--green)':pct>=85?'var(--amber)':'var(--red)')+'">'+pct+'%</div></div>' +
+    '<div class="kcard"><div class="kl">Status</div><div class="kv" style="font-size:13px;line-height:1.8">' +
+    (nsv>0?'<span style="color:var(--green)">&#9650; '+nsv+' superou</span><br>':'') +
+    (nat>0?'<span style="color:var(--amber)">&#9679; '+nat+' atingiu</span><br>':'') +
+    (nno>0?'<span style="color:var(--red)">&#10005; '+nno+' abaixo</span>':'') +
+    '</div></div></div><div class="cgrid">';
+  col.forEach(function(x){h+=buildCard(x[0],x[1]);});
+  h+='</div></div>';
   return h;
 }
 
-function rTodos() {
-  var el = document.getElementById('c-todos');
-  var dias = [];
-  Object.values(DB).forEach(function(s) { Object.keys(s).forEach(function(d) { if (dias.indexOf(d)<0) dias.push(d); }); });
+function rTodos(){
+  var el=document.getElementById('c-todos');
+  var dias=[];
+  Object.values(DB).forEach(function(s){Object.keys(s).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});
   dias.sort(function(a,b){return b.localeCompare(a);});
-  if (!dias.length) { el.innerHTML = '<div class="empty">Nenhum dado importado. Vá em Importar para começar.</div>'; return; }
-  var h = '<div class="dsel"><div class="sl" style="margin:0;white-space:nowrap">Data</div><select id="sel-todos" onchange="rTodosDay()">';
-  dias.forEach(function(d,i) { h += '<option value="'+d+'"'+(i===0?' selected':'')+'>'+fD(d)+'</option>'; });
-  h += '</select></div><div id="body-todos"></div>';
-  el.innerHTML = h;
+  if(!dias.length){el.innerHTML='<div class="empty">Nenhum dado importado. Vá em &#8679; Importar para começar.</div>';return;}
+  var h='<div class="dsel"><div class="sl" style="margin:0;white-space:nowrap">Data</div><select id="sel-todos" onchange="rTodosDay()">';
+  dias.forEach(function(d,i){h+='<option value="'+d+'"'+(i===0?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-todos"></div>';
+  el.innerHTML=h;
   rTodosDay();
 }
 
-function rTodosDay() {
-  var dk = document.getElementById('sel-todos') ? document.getElementById('sel-todos').value : null;
-  if (!dk) return;
-  var h = '';
-  Object.keys(CFG.setores).forEach(function(sk) { h += buildSetor(sk, dk); });
-  document.getElementById('body-todos').innerHTML = h;
+function rTodosDay(){
+  var dk=document.getElementById('sel-todos')?document.getElementById('sel-todos').value:null;
+  if(!dk)return;
+  var h='';
+  Object.keys(CFG).forEach(function(sk){h+=buildSetor(sk,dk);});
+  document.getElementById('body-todos').innerHTML=h;
 }
 
-function rSetor(sk) {
-  var el = document.getElementById('c-' + sk);
-  if (!el) return;
-  var dias = Object.keys(DB[sk] || {}).sort(function(a,b){return b.localeCompare(a);});
-  if (!dias.length) { el.innerHTML = '<div class="empty">Nenhum dado para este setor. Importe uma planilha.</div>'; return; }
-  var h = '<div class="dsel"><div class="sl" style="margin:0;white-space:nowrap">Data</div><select id="sel-'+sk+'" onchange="rSetorDay(\''+sk+'\')">';
-  dias.forEach(function(d,i) { h += '<option value="'+d+'"'+(i===0?' selected':'')+'>'+fD(d)+'</option>'; });
-  h += '</select></div><div id="body-'+sk+'"></div>';
-  el.innerHTML = h;
+function rSetor(sk){
+  var el=document.getElementById('c-'+sk);
+  if(!el)return;
+  var dias=Object.keys(DB[sk]||{}).sort(function(a,b){return b.localeCompare(a);});
+  if(!dias.length){el.innerHTML='<div class="empty">Nenhum dado para este setor. Importe uma planilha.</div>';return;}
+  var h='<div class="dsel"><div class="sl" style="margin:0;white-space:nowrap">Data</div><select id="sel-'+sk+'" onchange="rSetorDay(\''+sk+'\')">';
+  dias.forEach(function(d,i){h+='<option value="'+d+'"'+(i===0?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-'+sk+'"></div>';
+  el.innerHTML=h;
   rSetorDay(sk);
 }
 
-function rSetorDay(sk) {
-  var dk = document.getElementById('sel-'+sk) ? document.getElementById('sel-'+sk).value : null;
-  if (!dk) return;
-  var sd = (DB[sk] || {})[dk] || {};
-  var h = buildSetor(sk, dk);
-  Object.entries(sd).forEach(function(entry) {
-    var nome = entry[0], d = entry[1];
-    if (!d.inspecoes || !d.inspecoes.length) return;
-    h += '<div class="divider"></div><div class="sl">' + nome + ' — ' + d.total + ' inspeções</div>';
-    h += '<div class="tw"><table><thead><tr><th style="width:24px">#</th><th>Atividade</th><th style="width:58px">Início</th><th style="width:58px">Fim</th><th style="width:80px">Duração</th><th style="width:80px">Status</th></tr></thead><tbody>';
-    d.inspecoes.forEach(function(ins, i) {
-      var nc = ins.cf==='Não', te = !ins.cf;
-      var tag = nc ? '<span class="tag tnc">NC</span>' : te ? '<span class="tag tts">Teste</span>' : '<span class="tag tok">Conforme</span>';
-      h += '<tr><td>'+(i+1)+'</td><td>'+(ins.at||'—')+'</td><td>'+fT(ins.ini)+'</td><td>'+fT(ins.fim)+'</td><td>'+fDur(ins.dur)+'</td><td>'+tag+'</td></tr>';
+function rSetorDay(sk){
+  var dk=document.getElementById('sel-'+sk)?document.getElementById('sel-'+sk).value:null;
+  if(!dk)return;
+  var sd=(DB[sk]||{})[dk]||{};
+  var h=buildSetor(sk,dk);
+  Object.entries(sd).forEach(function(entry){
+    var nome=entry[0],d=entry[1];
+    if(!d.inspecoes||!d.inspecoes.length)return;
+    h+='<div class="divider"></div><div class="sl">'+nome+' — '+d.total+' inspeções</div>';
+    h+='<div class="tw"><table><thead><tr><th style="width:24px">#</th><th>Atividade</th><th style="width:58px">Início</th><th style="width:58px">Fim</th><th style="width:80px">Duração</th><th style="width:80px">Status</th></tr></thead><tbody>';
+    d.inspecoes.forEach(function(ins,i){
+      var nc=ins.cf==='Não',te=!ins.cf;
+      var tag=nc?'<span class="tag tnc">NC</span>':te?'<span class="tag tts">Teste</span>':'<span class="tag tok">Conforme</span>';
+      h+='<tr><td>'+(i+1)+'</td><td>'+(ins.at||'—')+'</td><td>'+fT(ins.ini)+'</td><td>'+fT(ins.fim)+'</td><td>'+fDur(ins.dur)+'</td><td>'+tag+'</td></tr>';
     });
-    h += '</tbody></table></div>';
+    h+='</tbody></table></div>';
   });
-  document.getElementById('body-'+sk).innerHTML = h;
+  document.getElementById('body-'+sk).innerHTML=h;
 }
 
-function rDaysList() {
-  var el = document.getElementById('days-list');
-  var itens = [];
-  Object.entries(DB).forEach(function(se) {
-    var sk = se[0];
-    Object.entries(se[1]).forEach(function(de) {
-      var dk = de[0], col = de[1];
-      itens.push({sk:sk, dk:dk,
-        tot: Object.values(col).reduce(function(a,c){return a+c.total;},0),
-        nc:  Object.values(col).reduce(function(a,c){return a+c.nc;},0),
-        nomes: Object.keys(col)
-      });
+function rDaysList(){
+  var el=document.getElementById('days-list');
+  var itens=[];
+  Object.entries(DB).forEach(function(se){
+    var sk=se[0];
+    Object.entries(se[1]).forEach(function(de){
+      var dk=de[0],col=de[1];
+      itens.push({sk:sk,dk:dk,
+        tot:Object.values(col).reduce(function(a,c){return a+c.total;},0),
+        nc:Object.values(col).reduce(function(a,c){return a+c.nc;},0),
+        nomes:Object.keys(col)});
     });
   });
   itens.sort(function(a,b){return b.dk.localeCompare(a.dk);});
-  if (!itens.length) { el.innerHTML = ''; return; }
-  var h = '<div class="sl">Dias importados</div><div class="tw"><table><thead><tr><th>Setor</th><th>Data</th><th>Colaboradores</th><th>Total</th><th>NCs</th><th></th></tr></thead><tbody>';
-  itens.forEach(function(i) {
-    var cor = CFG.setores[i.sk] ? CFG.setores[i.sk].cor : '#334155';
-    var nome = CFG.setores[i.sk] ? CFG.setores[i.sk].nome : i.sk;
-    h += '<tr><td style="font-weight:700;color:'+cor+'">'+nome+'</td><td style="font-weight:600">'+fD(i.dk)+'</td>' +
+  if(!itens.length){el.innerHTML='';return;}
+  var h='<div class="sl">Dias importados</div><div class="tw"><table><thead><tr><th>Setor</th><th>Data</th><th>Colaboradores</th><th>Total</th><th>NCs</th><th></th></tr></thead><tbody>';
+  itens.forEach(function(i){
+    var cor=CFG[i.sk]?CFG[i.sk].cor:'#334155';
+    var nome=CFG[i.sk]?CFG[i.sk].nome:i.sk;
+    h+='<tr><td style="font-weight:700;color:'+cor+'">'+nome+'</td><td style="font-weight:600">'+fD(i.dk)+'</td>' +
       '<td style="font-size:11px;color:var(--muted)">'+i.nomes.join(', ')+'</td><td>'+i.tot+'</td>' +
       '<td>'+(i.nc>0?'<span class="tag tnc">'+i.nc+'</span>':'<span class="tag tok">0</span>')+'</td>' +
       '<td><button class="del-btn" onclick="delDay(\''+i.sk+'\',\''+i.dk+'\')">Remover</button></td></tr>';
   });
-  h += '</tbody></table></div>';
-  el.innerHTML = h;
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
 }
 
-async function doUpload() {
-  var setor = document.getElementById('up-s').value;
-  var file = document.getElementById('up-f').files[0];
-  var key = document.getElementById('up-k').value;
-  var btn = document.getElementById('up-btn');
-  var msg = document.getElementById('up-msg');
-  msg.style.display = 'none';
-  if (!file) { msg.textContent='Selecione um arquivo .xlsx'; msg.className='msg err'; msg.style.display='block'; return; }
-  if (!key)  { msg.textContent='Digite a senha'; msg.className='msg err'; msg.style.display='block'; return; }
-  btn.disabled = true; btn.textContent = 'Importando...';
-  var fd = new FormData();
-  fd.append('setor', setor); fd.append('file', file); fd.append('key', key);
-  try {
-    var r = await fetch('/api/upload', {method:'POST', body:fd});
-    var d = await r.json();
-    if (d.ok) {
-      msg.textContent = '✓ Dia ' + d.data + ' importado — ' + d.setor + ' — ' + d.colaboradores.join(', ');
-      msg.className = 'msg ok'; msg.style.display = 'block';
-      document.getElementById('up-f').value = '';
-      await init(); rDaysList();
-    } else {
-      msg.textContent = d.error || 'Erro ao importar';
-      msg.className = 'msg err'; msg.style.display = 'block';
+async function doUpload(){
+  var setor=document.getElementById('up-s').value;
+  var file=document.getElementById('up-f').files[0];
+  var key=document.getElementById('up-k').value;
+  var btn=document.getElementById('up-btn');
+  var msg=document.getElementById('up-msg');
+  msg.style.display='none';
+  if(!file){msg.textContent='Selecione um arquivo .xlsx';msg.className='msg err';msg.style.display='block';return;}
+  if(!key){msg.textContent='Digite a senha';msg.className='msg err';msg.style.display='block';return;}
+  btn.disabled=true;btn.textContent='Importando...';
+  var fd=new FormData();
+  fd.append('setor',setor);fd.append('file',file);fd.append('key',key);
+  try{
+    var r=await fetch('/api/upload',{method:'POST',body:fd});
+    var d=await r.json();
+    if(d.ok){
+      msg.textContent='✓ Dia '+d.data+' importado — '+d.setor+' — '+d.colaboradores.join(', ');
+      msg.className='msg ok';msg.style.display='block';
+      document.getElementById('up-f').value='';
+      await loadData();rDaysList();
+    }else{
+      msg.textContent=d.error||'Erro ao importar';
+      msg.className='msg err';msg.style.display='block';
     }
-  } catch(e) {
-    msg.textContent = 'Erro: ' + e.message;
-    msg.className = 'msg err'; msg.style.display = 'block';
+  }catch(e){
+    msg.textContent='Erro: '+e.message;
+    msg.className='msg err';msg.style.display='block';
   }
-  btn.disabled = false; btn.textContent = 'Importar dados';
+  btn.disabled=false;btn.textContent='Importar dados';
 }
 
-async function delDay(sk, dk) {
-  if (!confirm('Remover ' + (CFG.setores[sk]?CFG.setores[sk].nome:sk) + ' - ' + fD(dk) + '?')) return;
-  var key = prompt('Senha:');
-  if (!key) return;
-  await fetch('/api/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({setor:sk,data:dk,key:key})});
-  await init(); rDaysList();
+async function delDay(sk,dk){
+  if(!confirm('Remover '+(CFG[sk]?CFG[sk].nome:sk)+' - '+fD(dk)+'?'))return;
+  var key=prompt('Senha:');
+  if(!key)return;
+  await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setor:sk,data:dk,key:key})});
+  await loadData();rDaysList();
 }
 
-init();
+async function loadData(){
+  try{
+    var r=await fetch('/api/data');
+    DB=await r.json();
+    var n=Object.values(DB).reduce(function(a,s){return a+Object.keys(s).length;},0);
+    document.getElementById('topinfo').textContent=n+' dias registrados';
+    rTodos();
+  }catch(e){
+    document.getElementById('topinfo').textContent='Erro ao carregar';
+    document.getElementById('c-todos').innerHTML='<div class="empty">Erro ao carregar. Recarregue a página.</div>';
+  }
+}
+
+loadData();
 </script>
 </body>
 </html>"""
