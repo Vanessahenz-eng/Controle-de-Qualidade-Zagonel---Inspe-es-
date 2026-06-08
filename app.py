@@ -18,30 +18,55 @@ SETORES = {
 }
 
 def load_data():
+    local_data = None
+    github_data = None
     try:
         if os.path.exists(DATA_FILE):
-            with open(DATA_FILE) as f: return json.load(f)
+            with open(DATA_FILE) as f:
+                local_data = json.load(f)
     except: pass
     if GITHUB_TOKEN and GITHUB_REPO:
         try:
-            r = requests.get(f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json', headers={'Authorization': f'token {GITHUB_TOKEN}'}, timeout=5)
-            if r.status_code == 200: return json.loads(base64.b64decode(r.json()['content']).decode())
+            r = requests.get(
+                f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json',
+                headers={'Authorization': f'token {GITHUB_TOKEN}'}, timeout=8)
+            if r.status_code == 200:
+                github_data = json.loads(base64.b64decode(r.json()['content']).decode())
         except: pass
-    return {'B2-03': {}, 'B1-01': {}, 'Injecao': {}}
+    base = {'B2-03': {}, 'B1-01': {}, 'Injecao': {}}
+    for source in [github_data, local_data]:
+        if source:
+            for setor, dias in source.items():
+                if setor not in base:
+                    base[setor] = {}
+                base[setor].update(dias)
+    return base
 
 def save_data(data):
     try:
-        with open(DATA_FILE, 'w') as f: json.dump(data, f, ensure_ascii=False, default=str)
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False, default=str)
     except: pass
     if GITHUB_TOKEN and GITHUB_REPO:
-        try:
-            content = base64.b64encode(json.dumps(data, ensure_ascii=False, default=str).encode()).decode()
-            r = requests.get(f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json', headers={'Authorization': f'token {GITHUB_TOKEN}'}, timeout=5)
-            sha = r.json().get('sha', '') if r.status_code == 200 else ''
-            payload = {'message': f'update {datetime.now().strftime("%Y-%m-%d %H:%M")}', 'content': content}
-            if sha: payload['sha'] = sha
-            requests.put(f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json', headers={'Authorization': f'token {GITHUB_TOKEN}'}, json=payload, timeout=10)
-        except: pass
+        for tentativa in range(3):
+            try:
+                encoded = base64.b64encode(json.dumps(data, ensure_ascii=False, default=str).encode()).decode()
+                r = requests.get(
+                    f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json',
+                    headers={'Authorization': f'token {GITHUB_TOKEN}'}, timeout=8)
+                sha = r.json().get('sha', '') if r.status_code == 200 else ''
+                payload = {
+                    'message': f'update {datetime.now().strftime("%Y-%m-%d %H:%M")}',
+                    'content': encoded
+                }
+                if sha: payload['sha'] = sha
+                resp = requests.put(
+                    f'https://api.github.com/repos/{GITHUB_REPO}/contents/data.json',
+                    headers={'Authorization': f'token {GITHUB_TOKEN}'},
+                    json=payload, timeout=15)
+                if resp.status_code in (200, 201):
+                    break
+            except: pass
 
 def norm_name(n, setor_key):
     if not n: return None
