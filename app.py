@@ -13,7 +13,7 @@ GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
 SETORES = {
     'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste']},
-    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste']},
+    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste'], 'campo_atividade': 'Etapa Auditada'},
     'Injecao': {
         'nome': 'Injeção', 'cor': '#7C3AED',
         'campos_executor': ['Nome do inspetor'],
