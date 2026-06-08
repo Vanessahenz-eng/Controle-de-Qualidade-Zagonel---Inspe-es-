@@ -16,7 +16,9 @@ SETORES = {
     'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste']},
     'Injecao': {
         'nome': 'Injeção', 'cor': '#7C3AED',
-        'campos_executor': ['Executor', 'Executor do teste'],
+        'campos_executor': ['Nome do inspetor'],
+        'campo_atividade': 'Máquina',
+
         'colaboradores': {
             # Turno 1 — 05:20 às 15:08 — meta 20
             'Kaline':   20,
@@ -30,11 +32,11 @@ SETORES = {
             'Renata':   11,
             'Raquel':   11,
         },
-        # Mapeamento de nomes completos → nome curto
         'nomes_map': {
             'kaline':    'Kaline',
             'jocemar':   'Jocemar',
             'patricia':  'Patricia',
+            'patrica':   'Patricia',
             'tatiana':   'Tatiana',
             'andressa':  'Andressa',
             'kaue':      'Kaue',
@@ -119,7 +121,11 @@ def get_meta(nome, setor_key):
 def parse_xlsx(file_bytes, setor_key):
     try: df = pd.read_excel(BytesIO(file_bytes))
     except Exception as e: return None, None, str(e)
-    campos_exec = SETORES[setor_key]['campos_executor']
+    setor_cfg = SETORES[setor_key]
+    campos_exec = setor_cfg['campos_executor']
+    campo_at = setor_cfg.get('campo_atividade', 'Confirme aqui o nome da máquina ou atividade')
+    campo_cf = setor_cfg.get('campo_conformidade', 'Todos os itens avaliados apresentaram-se conformes?')
+    valor_nc = setor_cfg.get('valor_nc', 'Não')
     by_code = {}
     for _, row in df.iterrows():
         cod = row.get('Código da avaliação')
@@ -128,11 +134,11 @@ def parse_xlsx(file_bytes, setor_key):
         if cod not in by_code: by_code[cod] = {'at': None, 'ex': None, 'cf': None, 'ini': None, 'fim': None}
         item = str(row.get('Item', '') or '').strip()
         resp = str(row.get('Resposta', '') or '').strip()
-        if item == 'Confirme aqui o nome da máquina ou atividade': by_code[cod]['at'] = resp
+        if item == campo_at: by_code[cod]['at'] = resp
         if item in campos_exec:
             n = norm_name(resp, setor_key)
             if n: by_code[cod]['ex'] = n
-        if item == 'Todos os itens avaliados apresentaram-se conformes?': by_code[cod]['cf'] = resp
+        if item == campo_cf: by_code[cod]['cf'] = resp
         ini = row.get('Data inicial'); fim = row.get('Data final')
         if not by_code[cod]['ini'] and ini is not None and str(ini) not in ('', 'nan'): by_code[cod]['ini'] = ini
         if fim is not None and str(fim) not in ('', 'nan'): by_code[cod]['fim'] = fim
@@ -154,7 +160,7 @@ def parse_xlsx(file_bytes, setor_key):
         p = ins['ex']
         if p not in colaboradores: colaboradores[p] = {'meta': get_meta(p, setor_key), 'total': 0, 'nc': 0, 'teste': 0, 'inspecoes': []}
         colaboradores[p]['total'] += 1
-        if ins['cf'] == 'Não': colaboradores[p]['nc'] += 1
+        if ins['cf'] == valor_nc: colaboradores[p]['nc'] += 1
         if not ins['cf']: colaboradores[p]['teste'] += 1
         colaboradores[p]['inspecoes'].append({'at': ins['at'], 'cf': ins['cf'], 'ini': ins['ini'], 'fim': ins['fim'], 'dur': ins['dur']})
     return data_key, colaboradores, None
