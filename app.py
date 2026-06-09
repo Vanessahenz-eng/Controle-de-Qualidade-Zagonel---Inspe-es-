@@ -135,6 +135,10 @@ def parse_xlsx(file_bytes, setor_key):
         item = str(row.get('Item', '') or '').strip()
         resp = str(row.get('Resposta', '') or '').strip()
         if item == campo_at: by_code[cod]['at'] = resp
+        # Guardar nome do checklist para usar como atividade quando campo_at não estiver presente
+        checklist_nome = row.get('Checklist', '')
+        if checklist_nome and not by_code[cod].get('checklist'):
+            by_code[cod]['checklist'] = str(checklist_nome)
         if item in campos_exec:
             n = norm_name(resp, setor_key)
             if n: by_code[cod]['ex'] = n
@@ -142,6 +146,11 @@ def parse_xlsx(file_bytes, setor_key):
         ini = row.get('Data inicial'); fim = row.get('Data final')
         if not by_code[cod]['ini'] and ini is not None and str(ini) not in ('', 'nan'): by_code[cod]['ini'] = ini
         if fim is not None and str(fim) not in ('', 'nan'): by_code[cod]['fim'] = fim
+    # Usar checklist como fallback de atividade quando campo_at não estiver preenchido
+    for o in by_code.values():
+        if not o['at'] and o.get('checklist'):
+            o['at'] = o['checklist']
+
     inspecoes = []
     for o in by_code.values():
         if not o['ex'] or not o['at']: continue
