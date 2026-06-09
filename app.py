@@ -44,6 +44,13 @@ SETORES = {
             'renata':    'Renata',
             'raquel':    'Raquel',
         },
+        'campo_tipo': 'Tipo de inspeção',
+        'tipos_map': {
+            'completa':   'Inspeção Completa Diária',
+            'rotina':     'Inspeção de Rotina',
+            'início':     'Inspeção de Início de Produção',
+            'inicio':     'Inspeção de Início de Produção',
+        },
     },
 }
 
@@ -131,10 +138,14 @@ def parse_xlsx(file_bytes, setor_key):
         cod = row.get('Código da avaliação')
         if cod is None or (isinstance(cod, float) and pd.isna(cod)): continue
         cod = str(cod)
-        if cod not in by_code: by_code[cod] = {'at': None, 'ex': None, 'cf': None, 'ini': None, 'fim': None}
+        if cod not in by_code: by_code[cod] = {'at': None, 'ex': None, 'cf': None, 'ini': None, 'fim': None, 'tipo': None, 'checklist': None}
         item = str(row.get('Item', '') or '').strip()
         resp = str(row.get('Resposta', '') or '').strip()
         if item == campo_at: by_code[cod]['at'] = resp
+        # Ler tipo de inspeção se configurado
+        campo_tipo = setor_cfg.get('campo_tipo', '')
+        if campo_tipo and item == campo_tipo:
+            by_code[cod]['tipo'] = resp
         # Guardar nome do checklist para usar como atividade quando campo_at não estiver presente
         checklist_nome = row.get('Checklist', '')
         if checklist_nome and not by_code[cod].get('checklist'):
@@ -158,7 +169,19 @@ def parse_xlsx(file_bytes, setor_key):
             ini = pd.to_datetime(o['ini'], dayfirst=True) if o['ini'] is not None else None
             fim = pd.to_datetime(o['fim'], dayfirst=True) if o['fim'] is not None else None
             dur = round((fim - ini).total_seconds() / 60, 2) if ini and fim and fim > ini else None
-            inspecoes.append({'at': o['at'], 'ex': o['ex'], 'cf': o['cf'], 'ini': ini.strftime('%Y-%m-%dT%H:%M:%S') if ini else None, 'fim': fim.strftime('%Y-%m-%dT%H:%M:%S') if fim else None, 'dur': dur})
+            # Normalizar tipo de inspeção
+            tipo_raw = o.get('tipo') or ''
+            tipo_norm = None
+            tipos_map = setor_cfg.get('tipos_map', {})
+            if tipo_raw:
+                tipo_lower = tipo_raw.lower().replace('ê','e').replace('í','i')
+                for chave, tipo_nome in tipos_map.items():
+                    if chave in tipo_lower:
+                        tipo_norm = tipo_nome
+                        break
+                if not tipo_norm:
+                    tipo_norm = tipo_raw  # manter original se não mapeado
+            inspecoes.append({'at': o['at'], 'ex': o['ex'], 'cf': o['cf'], 'tipo': tipo_norm, 'ini': ini.strftime('%Y-%m-%dT%H:%M:%S') if ini else None, 'fim': fim.strftime('%Y-%m-%dT%H:%M:%S') if fim else None, 'dur': dur})
         except: continue
     if not inspecoes: return None, None, 'Nenhuma inspeção encontrada'
     ref = next((i['ini'] for i in inspecoes if i['ini']), None)
@@ -171,6 +194,11 @@ def parse_xlsx(file_bytes, setor_key):
         colaboradores[p]['total'] += 1
         if ins['cf'] == valor_nc: colaboradores[p]['nc'] += 1
         if not ins['cf']: colaboradores[p]['teste'] += 1
+        # Contagem por tipo
+        tipo = ins.get('tipo')
+        if tipo:
+            if 'tipos' not in colaboradores[p]: colaboradores[p]['tipos'] = {}
+            colaboradores[p]['tipos'][tipo] = colaboradores[p]['tipos'].get(tipo, 0) + 1
         colaboradores[p]['inspecoes'].append({'at': ins['at'], 'cf': ins['cf'], 'ini': ins['ini'], 'fim': ins['fim'], 'dur': ins['dur']})
     return data_key, colaboradores, None
 
@@ -350,7 +378,16 @@ function bCard(nome,d){
   h+='<div><div class="cv">'+(tot-nc)+'</div><div class="cl2">conformes</div></div>';
   h+='<div><div class="cv">'+meta+'</div><div class="cl2">meta</div></div></div>';
   h+='<span class="pill">'+pt(c)+'</span>';
-  h+='<div class="nc"><span style="color:var(--mu)">NCs</span><span class="'+(nc>0?'nb':'ng')+'">'+nc+' NC'+(nc!==1?'s':'')+'</span></div></div>';
+  if(d.nc>0||nc>0){h+='<div class="nc"><span style="color:var(--mu)">NCs</span><span class="'+(nc>0?'nb':'ng')+'">'+nc+' NC'+(nc!==1?'s':'')+'</span></div>';}
+  if(d.tipos&&Object.keys(d.tipos).length>0){
+    h+='<div style="border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;">';
+    Object.entries(d.tipos).sort().forEach(function(e){
+      var label=e[0].replace('Inspeção ','').replace('de ','').replace('Diária','').replace('Produção','Início Prod.').trim();
+      h+='<div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:var(--mu)">'+label+'</span><span style="font-weight:600;">'+e[1]+'</span></div>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
   return h;
 }
 
