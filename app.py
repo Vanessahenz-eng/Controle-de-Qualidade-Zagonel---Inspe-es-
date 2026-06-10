@@ -13,7 +13,17 @@ GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
 SETORES = {
     'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste']},
-    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste'], 'campo_atividade': 'Etapa Auditada'},
+    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},
+                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste'],
+                   'campo_atividade': 'Etapa Auditada',
+                   'campo_tipo': 'Etapa Auditada',
+                   'tipo_no_campo_atividade': True,
+                   'tipos_map': {
+                       'completa': 'Inspeção Completa Diária',
+                       'rotina':   'Inspeção de Rotina',
+                       'conferência': 'Conferência e Aprovação de Cabos',
+                       'conferencia': 'Conferência e Aprovação de Cabos',
+                   }},
     'Injecao': {
         'nome': 'Injeção', 'cor': '#7C3AED',
         'campos_executor': ['Nome do inspetor'],
@@ -141,10 +151,26 @@ def parse_xlsx(file_bytes, setor_key):
         if cod not in by_code: by_code[cod] = {'at': None, 'ex': None, 'cf': None, 'ini': None, 'fim': None, 'tipo': None, 'checklist': None}
         item = str(row.get('Item', '') or '').strip()
         resp = str(row.get('Resposta', '') or '').strip()
-        if item == campo_at: by_code[cod]['at'] = resp
-        # Ler tipo de inspeção se configurado
+        if item == campo_at:
+            by_code[cod]['at'] = resp
+            # Para setores onde o tipo está embutido no campo atividade (ex: B1-01)
+            if setor_cfg.get('tipo_no_campo_atividade'):
+                tipos_map = setor_cfg.get('tipos_map', {})
+                resp_up = resp.upper()
+                tipo_encontrado = None
+                for chave, tipo_nome in tipos_map.items():
+                    if chave.upper() in resp_up:
+                        tipo_encontrado = tipo_nome
+                        # Limpar nome da atividade removendo o sufixo do tipo
+                        for sufixo in [' - INSPEÇÃO COMPLETA DIÁRIA', ' - INSPEÇÃO DE ROTINA',
+                                       ' -  INSPEÇÃO COMPLETA DIÁRIA', ' -  INSPEÇÃO DE ROTINA']:
+                            if sufixo.upper() in resp_up:
+                                by_code[cod]['at'] = resp[:resp.upper().index(sufixo.upper())].strip()
+                        break
+                by_code[cod]['tipo'] = tipo_encontrado or resp
+        # Ler tipo de inspeção se configurado em campo separado
         campo_tipo = setor_cfg.get('campo_tipo', '')
-        if campo_tipo and item == campo_tipo:
+        if campo_tipo and not setor_cfg.get('tipo_no_campo_atividade') and item == campo_tipo:
             by_code[cod]['tipo'] = resp
         # Guardar nome do checklist para usar como atividade quando campo_at não estiver presente
         checklist_nome = row.get('Checklist', '')
