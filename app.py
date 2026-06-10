@@ -26,8 +26,15 @@ SETORES = {
                    }},
     'Injecao': {
         'nome': 'Injeção', 'cor': '#7C3AED',
-        'campos_executor': ['Nome do inspetor'],
+        'campos_executor': ['Executor', 'Nome do inspetor'],
         'campo_atividade': 'Máquina',
+        'campo_tipo': 'Tipo de inspeção',
+        'tipos_map': {
+            'completa':   'Inspeção Completa Diária',
+            'rotina':     'Inspeção de Rotina',
+            'início':     'Inspeção de Início de Produção',
+            'inicio':     'Inspeção de Início de Produção',
+        },
 
         'colaboradores': {
             # Turno 1 — 05:20 às 15:08 — meta 20
