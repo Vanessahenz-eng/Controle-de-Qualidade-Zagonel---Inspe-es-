@@ -26,7 +26,7 @@ SETORES = {
                    }},
     'Injecao': {
         'nome': 'Injeção', 'cor': '#7C3AED',
-        'campos_executor': ['Executor', 'Nome do inspetor'],
+        'campos_executor': ['Executor', 'Nome do inspetor', 'Nome do Inspetor'],
         'campo_atividade': 'Máquina',
         'campo_tipo': 'Tipo de inspeção',
         'tipos_map': {
