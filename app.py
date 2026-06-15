@@ -581,5 +581,154 @@ loadDB();
 </body>
 </html>'''
 
+@app.route('/b2-03')
+def page_b203():
+    return Response(get_setor_html('B2-03', 'Apoio B2-03', '#2563EB'), mimetype='text/html')
+
+@app.route('/b1-01')
+def page_b101():
+    return Response(get_setor_html('B1-01', 'Apoio B1-01', '#059669'), mimetype='text/html')
+
+@app.route('/injecao')
+def page_injecao():
+    return Response(get_setor_html('Injecao', 'Injeção', '#7C3AED'), mimetype='text/html')
+
+def get_setor_html(setor_key, setor_nome, setor_cor):
+    return '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>''' + setor_nome + ''' - Controle de Inspecoes</title>
+<style>
+:root{--bg:#F0F4F8;--wh:#fff;--bd:#E2E8F0;--tx:#1A202C;--mu:#718096;--gr:#059669;--am:#D97706;--rd:#DC2626;--gr2:#ECFDF5;--am2:#FFFBEB;--rd2:#FEF2F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.top{background:''' + setor_cor + ''';color:#fff;padding:.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:18px;font-weight:700}
+.top p{font-size:11px;opacity:.85;margin-top:2px}
+.main{max-width:1100px;margin:0 auto;padding:1.5rem}
+.dsel{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
+.dsel select{flex:1;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--wh);color:var(--tx);font-family:inherit}
+.sl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1.5rem}
+.kc{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+.kl{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem}
+.kv{font-size:26px;font-weight:700}
+.ks{font-size:11px;color:var(--mu);margin-top:.2rem}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--wh);border:1px solid var(--bd);border-radius:12px;padding:1.25rem;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.sv::before{background:var(--gr)}.at::before{background:var(--am)}.no::before{background:var(--rd)}.em::before{background:var(--bd)}
+.cn{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem}
+.cm{font-size:11px;color:var(--mu);margin-bottom:.75rem}
+.cp{font-size:44px;font-weight:700;line-height:1;margin-bottom:.2rem}
+.sv .cp{color:var(--gr)}.at .cp{color:var(--am)}.no .cp{color:var(--rd)}.em .cp{color:#CBD5E0}
+.cs{font-size:12px;color:var(--mu);margin-bottom:.75rem}
+.bar{height:5px;background:#EDF2F7;border-radius:3px;margin-bottom:1rem;overflow:hidden}
+.bf{height:5px;border-radius:3px}
+.sv .bf{background:var(--gr)}.at .bf{background:var(--am)}.no .bf{background:var(--rd)}.em .bf{background:#CBD5E0}
+.cst{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bd);padding-top:.75rem}
+.cv{font-size:18px;font-weight:700;text-align:center}
+.cl2{font-size:10px;color:var(--mu);text-align:center;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-top:.6rem}
+.sv .pill{background:var(--gr2);color:var(--gr)}.at .pill{background:var(--am2);color:var(--am)}.no .pill{background:var(--rd2);color:var(--rd)}.em .pill{background:#F7FAFC;color:var(--mu)}
+.empty{text-align:center;padding:4rem;color:var(--mu);font-size:14px}
+.loading{text-align:center;padding:4rem;color:var(--mu);font-size:14px}
+.nav-back{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.8);text-decoration:none;margin-top:4px}
+.nav-back:hover{color:#fff}
+.date-nav{display:flex;gap:8px;align-items:center}
+.nav-btn{padding:6px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--wh);font-size:12px;cursor:pointer;font-family:inherit;color:var(--tx)}
+.nav-btn:hover{background:var(--bg)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>''' + setor_nome + '''</h1>
+    <p>Zagonel - Controle de Qualidade</p>
+  </div>
+  <div id="nfo" style="font-size:12px;opacity:.8">Carregando...</div>
+</div>
+<div class="main">
+  <div id="content"><div class="loading">Carregando dados...</div></div>
+</div>
+<script>
+var DB = {};
+var SK = "''' + setor_key + '''";
+var COR = "''' + setor_cor + '''";
+
+function fD(k){ var d=new Date(k+"T12:00:00"); return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear(); }
+function pad(n){ return n<10?"0"+n:""+n; }
+function cl(p,t){ if(!t)return"em"; if(p<85)return"no"; if(p<=100)return"at"; return"sv"; }
+function pt(c){ return c==="sv"?"Superou":c==="at"?"Atingiu a meta":c==="no"?"Nao atingiu":"Sem dados"; }
+
+function render(dk){
+  var el=document.getElementById("content");
+  var sd=(DB[SK]||{})[dk]||{};
+  var col=Object.keys(sd);
+  if(!col.length){el.innerHTML="<div class=\"empty\">Sem dados para esta data.</div>";return;}
+  var tot=0,meta=0,nc=0,nsv=0,nat=0,nno=0;
+  col.forEach(function(n){var d=sd[n];tot+=d.total;if(d.total>0)meta+=d.meta;nc+=d.nc;var p=d.meta>0?Math.round(d.total/d.meta*100):0,c=cl(p,d.total);if(c==="sv")nsv++;else if(c==="at")nat++;else if(c==="no")nno++;});
+  var pct=meta>0?Math.round(tot/meta*100):0;
+  var dias=Object.keys(DB[SK]||{}).sort(function(a,b){return b.localeCompare(a);});
+  var h="<div class=\"dsel\"><span class=\"sl\">Data</span><select id=\"ds\" onchange=\"goDay(this.value)\">";
+  dias.forEach(function(d){h+="<option value=\""+d+"\""+( d===dk?" selected":"")+">"+fD(d)+"</option>";});
+  h+="</select></div>";
+  h+="<div class=\"kg\">";
+  h+="<div class=\"kc\"><div class=\"kl\">Inspecoes</div><div class=\"kv\">"+tot+"</div><div class=\"ks\">meta: "+meta+"</div></div>";
+  h+="<div class=\"kc\"><div class=\"kl\">% da meta</div><div class=\"kv\" style=\"color:"+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd)")+"\">"+pct+"%</div></div>";
+  h+="<div class=\"kc\"><div class=\"kl\">Status da equipe</div><div class=\"kv\" style=\"font-size:13px;line-height:1.8\">";
+  if(nsv>0)h+="<span style=\"color:var(--gr)\">"+nsv+" superou</span><br>";
+  if(nat>0)h+="<span style=\"color:var(--am)\">"+nat+" atingiu</span><br>";
+  if(nno>0)h+="<span style=\"color:var(--rd)\">"+nno+" abaixo</span>";
+  h+="</div></div></div>";
+  h+="<div class=\"cg\">";
+  col.forEach(function(nome){
+    var d=sd[nome];
+    var tot2=d.total||0,meta2=d.meta||0,nc2=d.nc||0;
+    var pct2=meta2>0?Math.round(tot2/meta2*100):0,c=cl(pct2,tot2);
+    h+="<div class=\"card "+c+"\"><div class=\"cn\">"+nome+"</div><div class=\"cm\">Meta: "+meta2+" inspecoes/dia</div>";
+    h+="<div class=\"cp\">"+(!tot2?"--":pct2+"%")+"</div>";
+    h+="<div class=\"cs\">"+(!tot2?"Sem registros":tot2+" realizadas - meta "+meta2)+"</div>";
+    h+="<div class=\"bar\"><div class=\"bf\" style=\"width:"+(!tot2?0:Math.min(pct2,100))+"%\"></div></div>";
+    h+="<div class=\"cst\"><div><div class=\"cv\">"+tot2+"</div><div class=\"cl2\">realizadas</div></div>";
+    h+="<div><div class=\"cv\">"+(tot2-nc2)+"</div><div class=\"cl2\">conformes</div></div>";
+    h+="<div><div class=\"cv\">"+meta2+"</div><div class=\"cl2\">meta</div></div></div>";
+    h+="<span class=\"pill\">"+pt(c)+"</span>";
+    if(d.tipos&&Object.keys(d.tipos).length>0){";
+    h+="<div style=\"border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;\">";
+    Object.entries(d.tipos).sort().forEach(function(e){";
+      var label=e[0].replace("Inspecao ","").replace("Inspeção ","").replace("de ","").replace("Diária","").replace("Producao","Início Prod.").replace("Produção","Início Prod.").trim();
+      h+="<div style=\"display:flex;justify-content:space-between;margin-bottom:2px;\"><span style=\"color:var(--mu)\">"+label+"</span><span style=\"font-weight:600;\">"+e[1]+"</span></div>";
+    });
+    h+="</div>";
+    }
+    h+="</div>";
+  });
+  h+="</div>";
+  el.innerHTML=h;
+}
+
+function goDay(dk){ render(dk); }
+
+async function loadDB(){
+  try{
+    var r=await fetch("/api/data");
+    DB=await r.json();
+    var dias=Object.keys(DB[SK]||{}).sort(function(a,b){return b.localeCompare(a);});
+    var n=dias.length;
+    document.getElementById("nfo").textContent=n+(n===1?" dia registrado":" dias registrados");
+    if(dias.length) render(dias[0]);
+    else document.getElementById("content").innerHTML="<div class=\"empty\">Nenhum dado importado ainda.</div>";
+  }catch(e){
+    document.getElementById("nfo").textContent="Erro ao carregar";
+  }
+}
+loadDB();
+</script>
+</body>
+</html>''';
+
 if __name__ == '__main__':
     app.run(debug=True)
