@@ -1,5 +1,5 @@
 import os, json, base64, requests
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, session, redirect
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
@@ -10,6 +10,10 @@ DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
+
+MONITOR_USER = os.environ.get('MONITOR_USER', 'monitor')
+MONITOR_PASS = os.environ.get('MONITOR_PASS', 'monitor2026')
+app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
 
 SETORES = {
     'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor']},
@@ -732,3 +736,200 @@ loadDB();
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+    erro = ''
+    if request.method == 'POST':
+        if request.form.get('usuario') == MONITOR_USER and request.form.get('senha') == MONITOR_PASS:
+            session['monitor_ok'] = True
+            return redirect('/monitor')
+        erro = 'Usuário ou senha incorretos.'
+    return Response(get_login_html(erro), mimetype='text/html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+@app.route('/monitor')
+def page_monitor():
+    if not session.get('monitor_ok'):
+        return redirect('/login')
+    return Response(get_monitor_html(), mimetype='text/html')
+
+def get_login_html(erro=''):
+    return '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acesso Monitor - Zagonel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#F0F4F8;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:12px;padding:2.5rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.logo{text-align:center;margin-bottom:2rem}
+.logo div{font-size:22px;font-weight:700;color:#05B15D}
+.logo p{font-size:12px;color:#718096;margin-top:4px}
+.fg{margin-bottom:1rem}
+label{display:block;font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem}
+input{width:100%;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:.15s}
+input:focus{border-color:#05B15D}
+.btn{width:100%;padding:12px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:.5rem}
+.btn:hover{background:#047a42}
+.erro{background:#FEF2F2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:1rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">
+    <div>Zagonel</div>
+    <p>Controle de Inspecoes - Monitor</p>
+  </div>
+  ''' + ('<div class="erro">'+ erro +'</div>' if erro else '') + '''
+  <form method="POST">
+    <div class="fg">
+      <label>Usuario</label>
+      <input type="text" name="usuario" placeholder="Digite seu usuario" autofocus required>
+    </div>
+    <div class="fg">
+      <label>Senha</label>
+      <input type="password" name="senha" placeholder="Digite sua senha" required>
+    </div>
+    <button type="submit" class="btn">Entrar</button>
+  </form>
+</div>
+</body>
+</html>'''
+
+def get_monitor_html():
+    return '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor - Controle de Inspecoes Zagonel</title>
+<style>
+:root{--bg:#F0F4F8;--wh:#fff;--bd:#E2E8F0;--tx:#1A202C;--mu:#718096;--gr:#059669;--am:#D97706;--rd:#DC2626;--gr2:#ECFDF5;--am2:#FFFBEB;--rd2:#FEF2F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.top{background:#05B15D;color:#fff;padding:.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:18px;font-weight:700}
+.top p{font-size:11px;opacity:.85;margin-top:2px}
+.main{max-width:1200px;margin:0 auto;padding:1.5rem}
+.dsel{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
+.dsel select{flex:1;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--wh);color:var(--tx);font-family:inherit}
+.sl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.sb{margin-bottom:2rem}
+.sh{display:flex;align-items:center;gap:8px;margin-bottom:1rem}
+.sd{width:12px;height:12px;border-radius:3px}
+.st{font-size:16px;font-weight:700}
+.ss{font-size:12px;color:var(--mu);margin-left:auto}
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
+.kc{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.kl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
+.kv{font-size:24px;font-weight:700}
+.ks{font-size:11px;color:var(--mu);margin-top:.2rem}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--wh);border:1px solid var(--bd);border-radius:12px;padding:1.1rem;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.sv::before{background:var(--gr)}.at::before{background:var(--am)}.no::before{background:var(--rd)}.em::before{background:var(--bd)}
+.cn{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem}
+.cm{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.cp{font-size:38px;font-weight:700;line-height:1;margin-bottom:.15rem}
+.sv .cp{color:var(--gr)}.at .cp{color:var(--am)}.no .cp{color:var(--rd)}.em .cp{color:#CBD5E0}
+.cs{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.bar{height:4px;background:#EDF2F7;border-radius:3px;margin-bottom:.75rem;overflow:hidden}
+.bf{height:4px;border-radius:3px}
+.sv .bf{background:var(--gr)}.at .bf{background:var(--am)}.no .bf{background:var(--rd)}.em .bf{background:#CBD5E0}
+.cst{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bd);padding-top:.6rem}
+.cv{font-size:16px;font-weight:700;text-align:center}
+.cl2{font-size:10px;color:var(--mu);text-align:center;margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:.5rem}
+.sv .pill{background:var(--gr2);color:var(--gr)}.at .pill{background:var(--am2);color:var(--am)}.no .pill{background:var(--rd2);color:var(--rd)}.em .pill{background:#F7FAFC;color:var(--mu)}
+.div{border:none;border-top:1px solid var(--bd);margin:1.5rem 0}
+.empty{text-align:center;padding:3rem;color:var(--mu);font-size:13px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div><h1>Monitor de Inspecoes</h1><p>Zagonel - Qualidade Industrial</p></div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div id="nfo" style="font-size:12px;opacity:.8">Carregando...</div>
+    <a href="/logout" style="font-size:11px;color:rgba(255,255,255,.8);text-decoration:none;border:1px solid rgba(255,255,255,.4);padding:4px 10px;border-radius:6px;">Sair</a>
+  </div>
+</div>
+<div class="main">
+  <div id="content"><div class="empty">Carregando dados...</div></div>
+</div>
+<script>
+var DB={},SK=["B2-03","B1-01","Injecao"],SN={"B2-03":"Apoio B2-03","B1-01":"Apoio B1-01","Injecao":"Injecao"},SC={"B2-03":"#2563EB","B1-01":"#059669","Injecao":"#7C3AED"};
+function fD(k){var d=new Date(k+"T12:00:00");return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();}
+function pad(n){return n<10?"0"+n:""+n;}
+function cl(p,t){if(!t)return"em";if(p<85)return"no";if(p<=100)return"at";return"sv";}
+function pt(c){return c==="sv"?"Superou":c==="at"?"Atingiu a meta":c==="no"?"Nao atingiu":"Sem dados";}
+function bCard(nome,d){
+  var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
+  var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
+  var h="<div class=card "+c+"><div class=cn>"+nome+"</div><div class=cm>Meta: "+meta+" inspecoes/dia</div>";
+  h+="<div class=cp>"+(!tot?"--":pct+"%")+"</div>";
+  h+="<div class=cs>"+(!tot?"Sem registros":tot+" realizadas - meta "+meta)+"</div>";
+  h+="<div class=bar><div class=bf style=width:"+(!tot?0:Math.min(pct,100))+"%></div></div>";
+  h+="<div class=cst><div><div class=cv>"+tot+"</div><div class=cl2>realizadas</div></div>";
+  h+="<div><div class=cv>"+(tot-nc)+"</div><div class=cl2>conformes</div></div>";
+  h+="<div><div class=cv>"+meta+"</div><div class=cl2>meta</div></div></div>";
+  h+="<span class=pill>"+pt(c)+"</span>";
+  if(d.tipos&&Object.keys(d.tipos).length){
+    h+="<div style=border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;>";
+    Object.entries(d.tipos).sort().forEach(function(e){
+      var lb=e[0].replace("Inspeção ","").replace("de ","").replace("Diária","").replace("Produção","Início Prod.").trim();
+      h+="<div style=display:flex;justify-content:space-between;margin-bottom:2px;><span style=color:var(--mu)>"+lb+"</span><span style=font-weight:600>"+e[1]+"</span></div>";
+    });
+    h+="</div>";
+  }
+  h+="</div>";return h;
+}
+function bSetor(sk,dk){
+  var sd=(DB[sk]||{})[dk]||{},col=Object.keys(sd);
+  if(!col.length)return"";
+  var tot=0,meta=0,nc=0,nsv=0,nat=0,nno=0;
+  col.forEach(function(n){var d=sd[n];tot+=d.total;if(d.total>0)meta+=d.meta;nc+=d.nc;var p=d.meta>0?Math.round(d.total/d.meta*100):0,c=cl(p,d.total);if(c==="sv")nsv++;else if(c==="at")nat++;else if(c==="no")nno++;});
+  var pct=meta>0?Math.round(tot/meta*100):0;
+  var h="<div class=sb><div class=sh><div class=sd style=background:"+SC[sk]+"></div><div class=st>"+SN[sk]+"</div><div class=ss>"+tot+" insp - "+pct+"% meta</div></div>";
+  h+="<div class=kg><div class=kc><div class=kl>Inspecoes</div><div class=kv>"+tot+"</div><div class=ks>meta: "+meta+"</div></div>";
+  h+="<div class=kc><div class=kl>% da meta</div><div class=kv style=color:"+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd);")+">"+pct+"%</div></div>";
+  h+="<div class=kc><div class=kl>Status</div><div class=kv style=font-size:12px;line-height:1.8;>";
+  if(nsv>0)h+="<span style=color:var(--gr)>"+nsv+" superou</span><br>";
+  if(nat>0)h+="<span style=color:var(--am)>"+nat+" atingiu</span><br>";
+  if(nno>0)h+="<span style=color:var(--rd)>"+nno+" abaixo</span>";
+  h+="</div></div></div><div class=cg>";
+  col.forEach(function(n){h+=bCard(n,sd[n]);});
+  h+="</div></div>";return h;
+}
+function render(dk){
+  var el=document.getElementById("content"),dias=[];
+  SK.forEach(function(sk){Object.keys(DB[sk]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});
+  dias.sort(function(a,b){return b.localeCompare(a);});
+  if(!dias.length){el.innerHTML="<div class=empty>Nenhum dado disponivel.</div>";return;}
+  if(!dk)dk=dias[0];
+  var h="<div class=dsel><span class=sl>Data</span><select id=ds onchange=render(this.value)>";
+  dias.forEach(function(d){h+="<option value="+d+(d===dk?" selected":"")+">"+fD(d)+"</option>";});
+  h+="</select></div>";
+  var temDados=false;
+  SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){h+=s;h+="<div class=div></div>";temDados=true;}});
+  if(!temDados)h+="<div class=empty>Sem dados para esta data.</div>";
+  el.innerHTML=h;
+}
+async function loadDB(){
+  try{
+    var r=await fetch("/api/data");DB=await r.json();
+    var n=Object.values(DB).reduce(function(a,s){return a+Object.keys(s).length;},0);
+    document.getElementById("nfo").textContent=n+" dias registrados";
+    render();
+  }catch(e){document.getElementById("nfo").textContent="Erro ao carregar";}
+}
+loadDB();
+</script>
+</body>
+</html>'''
