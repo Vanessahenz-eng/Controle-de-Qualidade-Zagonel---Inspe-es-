@@ -918,12 +918,6 @@ function bSetor(sk,dk){
   col.forEach(function(n){h+=bCard(n,sd[n]);});
   return h+"</div></div>";
 }
-function mkSel(containerId, dias, dk, onChange){
-  var el=document.getElementById(containerId);if(!el)return;
-  var h="<div class=dsel><span class=sl>Data</span><select onchange="+onChange+"(this.value)>";
-  dias.forEach(function(d){h+="<option value="+d+(d===dk?" selected":"")+">"+fD(d)+"</option>";});
-  el.innerHTML=h+"</select></div><div id=body-"+containerId+"></div>";
-}
 function getDias(sk){
   var dias=[];
   if(sk==="todos"){SK.forEach(function(s){Object.keys(DB[s]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});}
@@ -931,20 +925,31 @@ function getDias(sk){
   return dias.sort(function(a,b){return b.localeCompare(a);});
 }
 function rTodos(dk){
-  var dias=getDias("todos");if(!dias.length){document.getElementById("c-todos").innerHTML="<div class=empty>Nenhum dado importado.</div>";return;}
+  var el=document.getElementById("c-todos");
+  var dias=getDias("todos");
+  if(!dias.length){el.innerHTML='<div class="empty">Nenhum dado importado.</div>';return;}
   if(!dk)dk=dias[0];
-  mkSel("c-todos",dias,dk,"rTodos");
-  var h="",ok=false;
-  SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){h+=s;h+="<div class=div></div>";ok=true;}});
-  document.getElementById("body-c-todos").innerHTML=ok?h:"<div class=empty>Sem dados para esta data.</div>";
+  var h='<div class="dsel"><span class="sl">Data</span><select id="sel-todos">';
+  dias.forEach(function(d){h+='<option value="'+d+'"'+(d===dk?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-c-todos"></div>';
+  el.innerHTML=h;
+  document.getElementById("sel-todos").addEventListener("change",function(){rTodos(this.value);});
+  var bod="",ok=false;
+  SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){bod+=s;bod+='<div class="div"></div>';ok=true;}});
+  document.getElementById("body-c-todos").innerHTML=ok?bod:'<div class="empty">Sem dados para esta data.</div>';
 }
 function rSetor(sk,dk){
-  var cid="c-"+sk,dias=getDias(sk);
-  var el=document.getElementById(cid);if(!el)return;
-  if(!dias.length){el.innerHTML="<div class=empty>Sem dados para este setor.</div>";return;}
+  var cid="c-"+sk,el=document.getElementById(cid);
+  if(!el)return;
+  var dias=getDias(sk);
+  if(!dias.length){el.innerHTML='<div class="empty">Sem dados para este setor.</div>';return;}
   if(!dk)dk=dias[0];
-  mkSel(cid,dias,dk,"function(d){rSetor('"+sk+"',d)}");
-  document.getElementById("body-"+cid).innerHTML=bSetor(sk,dk)||"<div class=empty>Sem dados para esta data.</div>";
+  var h='<div class="dsel"><span class="sl">Data</span><select id="sel-'+sk+'">';
+  dias.forEach(function(d){h+='<option value="'+d+'"'+(d===dk?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-'+cid+'"></div>';
+  el.innerHTML=h;
+  document.getElementById("sel-"+sk).addEventListener("change",(function(s){return function(){rSetor(s,this.value);};})(sk));
+  document.getElementById("body-"+cid).innerHTML=bSetor(sk,dk)||'<div class="empty">Sem dados para esta data.</div>';
 }
 function goTab(s,btn){
   document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
