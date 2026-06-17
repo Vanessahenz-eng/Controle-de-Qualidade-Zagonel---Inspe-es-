@@ -883,16 +883,19 @@ function pt(c){return c==="sv"?"Superou":c==="at"?"Atingiu a meta":c==="no"?"Nao
 function bCard(nome,d){
   var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
   var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
-  var h="<div class=card "+c+"><div class=cn>"+nome+"</div><div class=cm>Meta: "+meta+" inspecoes/dia</div>";
-  h+="<div class=cp>"+(!tot?"--":pct+"%")+"</div><div class=cs>"+(!tot?"Sem registros":tot+" realizadas - meta "+meta)+"</div>";
-  h+="<div class=bar><div class=bf style=width:"+(!tot?0:Math.min(pct,100))+"%></div></div>";
-  h+="<div class=cst><div><div class=cv>"+tot+"</div><div class=cl2>realizadas</div></div><div><div class=cv>"+(tot-nc)+"</div><div class=cl2>conformes</div></div><div><div class=cv>"+meta+"</div><div class=cl2>meta</div></div></div>";
-  h+="<span class=pill>"+pt(c)+"</span>";
+  var h='<div class="card '+c+'"><div class="cn">'+nome+'</div><div class="cm">Meta: '+meta+' inspecoes/dia</div>';
+  h+='<div class="cp">'+(!tot?"--":pct+"%")+'</div>';
+  h+='<div class="cs">'+(!tot?"Sem registros":tot+" realizadas - meta "+meta)+'</div>';
+  h+='<div class="bar"><div class="bf" style="width:'+(!tot?0:Math.min(pct,100))+'%"></div></div>';
+  h+='<div class="cst"><div><div class="cv">'+tot+'</div><div class="cl2">realizadas</div></div>';
+  h+='<div><div class="cv">'+(tot-nc)+'</div><div class="cl2">conformes</div></div>';
+  h+='<div><div class="cv">'+meta+'</div><div class="cl2">meta</div></div></div>';
+  h+='<span class="pill">'+pt(c)+'</span>';
   if(d.tipos&&Object.keys(d.tipos).length){
-    h+="<div style=border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;>";
+    h+='<div style="border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;">';
     Object.entries(d.tipos).sort().forEach(function(e){
       var lb=e[0].replace("Inspeção ","").replace("de ","").replace("Diária","").replace("Produção","Início Prod.").trim();
-      h+="<div style=display:flex;justify-content:space-between;margin-bottom:2px;><span style=color:var(--mu)>"+lb+"</span><span style=font-weight:600>"+e[1]+"</span></div>";
+      h+='<div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:var(--mu)">'+lb+'</span><span style="font-weight:600">'+e[1]+'</span></div>';
     });
     h+="</div>";
   }
@@ -904,14 +907,14 @@ function bSetor(sk,dk){
   var tot=0,meta=0,nc=0,nsv=0,nat=0,nno=0;
   col.forEach(function(n){var d=sd[n];tot+=d.total;if(d.total>0)meta+=d.meta;nc+=d.nc;var p=d.meta>0?Math.round(d.total/d.meta*100):0,c=cl(p,d.total);if(c==="sv")nsv++;else if(c==="at")nat++;else if(c==="no")nno++;});
   var pct=meta>0?Math.round(tot/meta*100):0;
-  var h="<div class=sb><div class=sh><div class=sd style=background:"+SC[sk]+"></div><div class=st>"+SN[sk]+"</div><div class=ss>"+tot+" insp · "+pct+"% meta</div></div>";
-  h+="<div class=kg><div class=kc><div class=kl>Inspecoes</div><div class=kv>"+tot+"</div><div class=ks>meta: "+meta+"</div></div>";
-  h+="<div class=kc><div class=kl>% da meta</div><div class=kv style=color:"+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd)")+">"+pct+"%</div></div>";
-  h+="<div class=kc><div class=kl>Status</div><div class=kv style=font-size:12px;line-height:1.8;>";
-  if(nsv>0)h+="<span style=color:var(--gr)>"+nsv+" superou</span><br>";
-  if(nat>0)h+="<span style=color:var(--am)>"+nat+" atingiu</span><br>";
-  if(nno>0)h+="<span style=color:var(--rd)>"+nno+" abaixo</span>";
-  h+="</div></div></div><div class=cg>";
+  var h='<div class="sb"><div class="sh"><div class="sd" style="background:'+SC[sk]+'"></div><div class="st">'+SN[sk]+'</div><div class="ss">'+tot+' insp · '+pct+'% meta</div></div>';
+  h+='<div class="kg"><div class="kc"><div class="kl">Inspecoes</div><div class="kv">'+tot+'</div><div class="ks">meta: '+meta+'</div></div>';
+  h+='<div class="kc"><div class="kl">% da meta</div><div class="kv" style="color:'+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd)")+'">'+pct+'%</div></div>';
+  h+='<div class="kc"><div class="kl">Status</div><div class="kv" style="font-size:12px;line-height:1.8;">';
+  if(nsv>0)h+='<span style="color:var(--gr)">'+nsv+' superou</span><br>';
+  if(nat>0)h+='<span style="color:var(--am)">'+nat+' atingiu</span><br>';
+  if(nno>0)h+='<span style="color:var(--rd)">'+nno+' abaixo</span>';
+  h+='</div></div></div><div class="cg">';
   col.forEach(function(n){h+=bCard(n,sd[n]);});
   return h+"</div></div>";
 }
