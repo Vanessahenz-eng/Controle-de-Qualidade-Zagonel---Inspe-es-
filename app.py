@@ -797,7 +797,8 @@ def get_painel_html(nome_usuario, setores_permitidos):
     setores_js = str(setores_permitidos).replace("'",'"')
     sn_js = str({k: SN[k] for k in setores_permitidos if k in SN}).replace("'",'"')
     sc_js = str({k: SC[k] for k in setores_permitidos if k in SC}).replace("'",'"')
-    return '''<!DOCTYPE html>
+    tem_todos = len(setores_permitidos) > 1
+    return """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -811,6 +812,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background
 .top h1{font-size:18px;font-weight:700}
 .top p{font-size:11px;opacity:.85;margin-top:2px}
 .main{max-width:1200px;margin:0 auto;padding:1.5rem}
+.tabs{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--bd);background:var(--wh);color:var(--mu)}
+.tab.on{color:#fff;border-color:transparent}
+#tt.on{background:#334155}
+#tb1.on{background:#2563EB}
+#tb2.on{background:#059669}
+#tb3.on{background:#7C3AED}
+.pg{display:none}.pg.on{display:block}
 .dsel{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
 .dsel select{flex:1;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--wh);color:var(--tx);font-family:inherit}
 .sl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
@@ -851,7 +860,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background
 <div class="top">
   <div>
     <h1>Controle de Inspecoes</h1>
-    <p>Olá, ''' + nome_usuario + ''' · Zagonel Qualidade Industrial</p>
+    <p>Ola, """ + nome_usuario + """ &middot; Zagonel Qualidade Industrial</p>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
     <div id="nfo" style="font-size:12px;opacity:.8">Carregando...</div>
@@ -859,10 +868,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background
   </div>
 </div>
 <div class="main">
-  <div id="content"><div class="empty">Carregando dados...</div></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="pg-todos" class="pg on"><div id="c-todos"><div class="empty">Carregando...</div></div></div>
+  <div id="pg-B2-03" class="pg"><div id="c-B2-03"></div></div>
+  <div id="pg-B1-01" class="pg"><div id="c-B1-01"></div></div>
+  <div id="pg-Injecao" class="pg"><div id="c-Injecao"></div></div>
 </div>
 <script>
-var DB={},SK=''' + setores_js + ''',SN=''' + sn_js + ''',SC=''' + sc_js + ''';
+var DB={},SK=""" + setores_js + """,SN=""" + sn_js + """,SC=""" + sc_js + """,TEM_TODOS=""" + ('true' if tem_todos else 'false') + """;
 function fD(k){var d=new Date(k+"T12:00:00");return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();}
 function pad(n){return n<10?"0"+n:""+n;}
 function cl(p,t){if(!t)return"em";if(p<85)return"no";if(p<=100)return"at";return"sv";}
@@ -902,32 +915,71 @@ function bSetor(sk,dk){
   col.forEach(function(n){h+=bCard(n,sd[n]);});
   return h+"</div></div>";
 }
-function render(dk){
-  var el=document.getElementById("content"),dias=[];
-  SK.forEach(function(sk){Object.keys(DB[sk]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});
-  dias.sort(function(a,b){return b.localeCompare(a);});
-  if(!dias.length){el.innerHTML="<div class=empty>Nenhum dado disponivel.</div>";return;}
-  if(!dk)dk=dias[0];
-  var h="<div class=dsel><span class=sl>Data</span><select id=ds onchange=render(this.value)>";
+function mkSel(containerId, dias, dk, onChange){
+  var el=document.getElementById(containerId);if(!el)return;
+  var h="<div class=dsel><span class=sl>Data</span><select onchange="+onChange+"(this.value)>";
   dias.forEach(function(d){h+="<option value="+d+(d===dk?" selected":"")+">"+fD(d)+"</option>";});
-  h+="</select></div>";
-  var ok=false;
+  el.innerHTML=h+"</select></div><div id=body-"+containerId+"></div>";
+}
+function getDias(sk){
+  var dias=[];
+  if(sk==="todos"){SK.forEach(function(s){Object.keys(DB[s]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});}
+  else{dias=Object.keys(DB[sk]||{});}
+  return dias.sort(function(a,b){return b.localeCompare(a);});
+}
+function rTodos(dk){
+  var dias=getDias("todos");if(!dias.length){document.getElementById("c-todos").innerHTML="<div class=empty>Nenhum dado importado.</div>";return;}
+  if(!dk)dk=dias[0];
+  mkSel("c-todos",dias,dk,"rTodos");
+  var h="",ok=false;
   SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){h+=s;h+="<div class=div></div>";ok=true;}});
-  if(!ok)h+="<div class=empty>Sem dados para esta data.</div>";
-  el.innerHTML=h;
+  document.getElementById("body-c-todos").innerHTML=ok?h:"<div class=empty>Sem dados para esta data.</div>";
+}
+function rSetor(sk,dk){
+  var cid="c-"+sk,dias=getDias(sk);
+  var el=document.getElementById(cid);if(!el)return;
+  if(!dias.length){el.innerHTML="<div class=empty>Sem dados para este setor.</div>";return;}
+  if(!dk)dk=dias[0];
+  mkSel(cid,dias,dk,"function(d){rSetor('"+sk+"',d)}");
+  document.getElementById("body-"+cid).innerHTML=bSetor(sk,dk)||"<div class=empty>Sem dados para esta data.</div>";
+}
+function goTab(s,btn){
+  document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+  btn.classList.add("on");
+  document.querySelectorAll(".pg").forEach(function(p){p.classList.remove("on");});
+  document.getElementById("pg-"+s).classList.add("on");
+  if(s==="todos")rTodos();else rSetor(s);
+}
+function buildTabs(){
+  var tabs=document.getElementById("tabs");tabs.innerHTML="";
+  if(TEM_TODOS){
+    var b=document.createElement("button");b.className="tab on";b.id="tt";b.textContent="Todos os setores";
+    b.onclick=function(){goTab("todos",b);};tabs.appendChild(b);
+  }
+  SK.forEach(function(sk,i){
+    var b=document.createElement("button");
+    b.className="tab"+((!TEM_TODOS&&i===0)?" on":"");
+    b.id="tb"+(i+1);b.textContent=SN[sk];
+    b.style.cssText="--sc:"+SC[sk];
+    b.onclick=function(){goTab(sk,b);};
+    b.addEventListener("click",function(){this.style.background=SC[sk];this.style.color="#fff";this.style.borderColor="transparent";});
+    tabs.appendChild(b);
+  });
 }
 async function loadDB(){
   try{
     var r=await fetch("/api/data");DB=await r.json();
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
     document.getElementById("nfo").textContent=n+" dias registrados";
-    render();
+    buildTabs();
+    if(TEM_TODOS)rTodos();else if(SK.length)rSetor(SK[0]);
   }catch(e){document.getElementById("nfo").textContent="Erro ao carregar";}
 }
 loadDB();
 </script>
 </body>
-</html>''';
+</html>""";
+
 
 def get_login_html(erro=''):
     return '''<!DOCTYPE html>
