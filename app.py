@@ -767,10 +767,10 @@ def api_salvar_justificativa():
     if not session.get('usuario'):
         return jsonify({'error': 'Nao autenticado'}), 401
     data = request.get_json() or {}
-    setor     = data.get('setor')
-    colab     = data.get('colaborador')
-    dia       = data.get('data')
-    texto     = data.get('texto', '').strip()
+    setor = data.get('setor')
+    colab = data.get('colaborador')
+    dia   = data.get('data')
+    texto = data.get('texto', '').strip()
     if not all([setor, colab, dia, texto]):
         return jsonify({'error': 'Dados incompletos'}), 400
     db = load_data()
@@ -923,21 +923,6 @@ function bCard(nome,d){
     });
     h+="</div>";
   }
-  // Mostrar justificativa se existir (ou aviso se pendente)
-  if(typeof JUST!=="undefined"&&typeof _DK!=="undefined"){
-    var pct2=d.meta>0?Math.round(d.total/d.meta*100):100;
-    var sk2=typeof _SK!=="undefined"?_SK:"";
-    var jtext=JUST[sk2]&&JUST[sk2][nome]&&JUST[sk2][nome][_DK]?JUST[sk2][nome][_DK]:null;
-    if(pct2<85){
-      if(jtext){
-        h+='<div style="border-top:1px solid #FCA5A5;margin-top:.5rem;padding-top:.5rem;font-size:11px;background:#FEF2F2;border-radius:0 0 8px 8px;padding:.5rem;margin:-.2rem -1.1rem -1.1rem;">';
-        h+='<div style="font-weight:700;color:#991B1B;margin-bottom:2px;">Justificativa:</div>';
-        h+='<div style="color:#7F1D1D;">'+jtext+'</div></div>';
-      } else if(TEM_TODOS){
-        h+='<div style="border-top:1px solid #FCA5A5;margin-top:.5rem;padding-top:.5rem;font-size:11px;color:#991B1B;font-weight:600;">⚠ Justificativa pendente</div>';
-      }
-    }
-  }
   return h+"</div>";
 }
 function bSetor(sk,dk){
@@ -975,7 +960,6 @@ function rTodos(dk){
   document.getElementById("sel-todos").addEventListener("change",function(){rTodos(this.value);});
   var bod="",ok=false;
   SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){bod+=s;bod+='<div class="div"></div>';ok=true;}});
-  _DK=dk;
   document.getElementById("body-c-todos").innerHTML=ok?bod:'<div class="empty">Sem dados para esta data.</div>';
 }
 function rSetor(sk,dk){
@@ -989,7 +973,6 @@ function rSetor(sk,dk){
   h+='</select></div><div id="body-'+cid+'"></div>';
   el.innerHTML=h;
   document.getElementById("sel-"+sk).addEventListener("change",(function(s){return function(){rSetor(s,this.value);};})(sk));
-  _SK=sk; _DK=dk;
   document.getElementById("body-"+cid).innerHTML=bSetor(sk,dk)||'<div class="empty">Sem dados para esta data.</div>';
 }
 function goTab(s,btn){
@@ -1015,51 +998,44 @@ function buildTabs(){
     tabs.appendChild(b);
   });
 }
-var JUST={}, _SK="", _DK="", NOME_INSP=""" + nome_usuario + """;
+var JUST={}, NOME_INSP=JSON.parse('"" + nome_usuario + ""');
 
 function getPendentes(){
-  // Apenas inspetores (sem TEM_TODOS) verificam suas próprias pendências
   if(TEM_TODOS) return [];
   var pend=[];
   try{
     SK.forEach(function(sk){
-      var dias=Object.keys(DB[sk]||{});
-      dias.forEach(function(dk){
-        var colab=DB[sk][dk]||{};
-        // Inspetor só verifica o próprio nome
+      Object.keys(DB[sk]||{}).forEach(function(dk){
+        var colab=(DB[sk][dk])||{};
         if(!colab[NOME_INSP]) return;
         var d=colab[NOME_INSP];
         var pct=d.meta>0?Math.round(d.total/d.meta*100):100;
         if(pct<85){
-          var jatem=(JUST[sk]&&JUST[sk][NOME_INSP]&&JUST[sk][NOME_INSP][dk]);
+          var jatem=JUST[sk]&&JUST[sk][NOME_INSP]&&JUST[sk][NOME_INSP][dk];
           if(!jatem) pend.push({sk:sk,nome:NOME_INSP,dk:dk,pct:pct,tot:d.total,meta:d.meta});
         }
       });
     });
-  }catch(e){ console.error("getPendentes erro:",e); }
-  pend.sort(function(a,b){return a.dk.localeCompare(b.dk);});
-  return pend;
+  }catch(e){console.error(e);}
+  return pend.sort(function(a,b){return a.dk.localeCompare(b.dk);});
 }
 
 function mostrarBloqueio(pend){
   var p=pend[0];
   var el=document.getElementById("content");
-  var resto=pend.length>1?'<div style="font-size:11px;color:#718096;margin-bottom:1rem;">Ainda há mais '+(pend.length-1)+' justificativa(s) pendente(s) após esta.</div>':'';
+  var msg=pend.length>1?" (mais "+(pend.length-1)+" pendente(s) após esta)":"";
   el.innerHTML=
-    '<div style="max-width:500px;margin:2rem auto;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;">'
-    +'<div style="background:#FEF2F2;border-radius:8px;padding:1rem;margin-bottom:1.5rem;">'
-    +'<div style="font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.25rem;">Justificativa obrigatória</div>'
-    +'<div style="font-size:13px;color:#7F1D1D;">Você ficou com <strong>'+p.pct+'%</strong> da meta no dia <strong>'+fD(p.dk)+'</strong> ('+p.tot+'/'+p.meta+' inspeções).</div>'
-    +'</div>'
-    +'<div style="font-size:13px;font-weight:700;color:#1A202C;margin-bottom:.5rem;">Qual o motivo do resultado abaixo de 85%?</div>'
-    +'<textarea id="jtexto" rows="4" placeholder="Descreva o motivo..." style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:1rem;"></textarea>'
-    +resto
-    +'<button id="jbtn" style="width:100%;padding:11px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Registrar justificativa</button>'
-    +'</div>';
+    "<div style='max-width:500px;margin:2rem auto;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;'>"
+    +"<div style='background:#FEF2F2;border-radius:8px;padding:1rem;margin-bottom:1.5rem;'>"
+    +"<div style='font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.25rem;'>Justificativa obrigatória</div>"
+    +"<div style='font-size:13px;color:#7F1D1D;'>Você ficou com <strong>"+p.pct+"%</strong> da meta no dia <strong>"+fD(p.dk)+"</strong> ("+p.tot+"/"+p.meta+" inspeções)"+msg+".</div>"
+    +"</div>"
+    +"<div style='font-size:13px;font-weight:700;color:#1A202C;margin-bottom:.5rem;'>Qual o motivo do resultado abaixo de 85%?</div>"
+    +"<textarea id='jtexto' rows='4' placeholder='Descreva o motivo...' style='width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:1rem;'></textarea>"
+    +"<button id='jbtn' style='width:100%;padding:11px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;'>Registrar justificativa</button>"
+    +"</div>";
   document.getElementById("nfo").textContent="Justificativa pendente";
-  document.getElementById("jbtn").addEventListener("click", function(){
-    salvarJust(p.sk, p.nome, p.dk);
-  });
+  document.getElementById("jbtn").onclick=function(){salvarJust(p.sk,p.nome,p.dk);};
 }
 
 async function salvarJust(sk,nome,dk){
@@ -1076,33 +1052,27 @@ async function salvarJust(sk,nome,dk){
       if(pend.length) mostrarBloqueio(pend);
       else iniciarPainel();
     }
-  }catch(e){ alert("Erro ao salvar. Tente novamente."); }
+  }catch(e){alert("Erro ao salvar.");}
 }
 
 function iniciarPainel(){
   var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
   document.getElementById("nfo").textContent=n+" dias registrados";
   buildTabs();
-  if(TEM_TODOS) rTodos();
-  else if(SK.length) rSetor(SK[0]);
+  if(TEM_TODOS)rTodos();else if(SK.length)rSetor(SK[0]);
 }
 
 async function loadDB(){
   try{
-    var r1=await fetch("/api/data");
-    DB=await r1.json();
-    var r2=await fetch("/api/justificativas");
-    JUST=await r2.json();
+    var r1=await fetch("/api/data"); DB=await r1.json();
+    var r2=await fetch("/api/justificativas"); JUST=await r2.json();
     var pend=getPendentes();
-    if(pend.length){
-      mostrarBloqueio(pend);
-    } else {
-      iniciarPainel();
-    }
+    if(pend.length) mostrarBloqueio(pend);
+    else iniciarPainel();
   }catch(e){
-    console.error("loadDB erro:",e);
-    document.getElementById("nfo").textContent="Erro ao carregar";
-    document.getElementById("content").innerHTML='<div class="empty">Erro ao carregar dados. Recarregue a página.</div>';
+    console.error(e);
+    document.getElementById("content").innerHTML="<div class=\"empty\">Erro ao carregar. Recarregue a página.</div>";
+    document.getElementById("nfo").textContent="Erro";
   }
 }
 loadDB();
