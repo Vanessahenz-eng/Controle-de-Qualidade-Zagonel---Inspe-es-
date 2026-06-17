@@ -1018,22 +1018,25 @@ function buildTabs(){
 var JUST={}, _SK="", _DK="", NOME_INSP=""" + nome_usuario + """;
 
 function getPendentes(){
+  // Apenas inspetores (sem TEM_TODOS) verificam suas próprias pendências
+  if(TEM_TODOS) return [];
   var pend=[];
-  SK.forEach(function(sk){
-    var dias=Object.keys(DB[sk]||{});
-    dias.forEach(function(dk){
-      var colab=DB[sk][dk];
-      Object.keys(colab).forEach(function(nome){
-        if(nome!==NOME_INSP&&TEM_TODOS)return; // inspetores veem só os próprios
-        var d=colab[nome];
+  try{
+    SK.forEach(function(sk){
+      var dias=Object.keys(DB[sk]||{});
+      dias.forEach(function(dk){
+        var colab=DB[sk][dk]||{};
+        // Inspetor só verifica o próprio nome
+        if(!colab[NOME_INSP]) return;
+        var d=colab[NOME_INSP];
         var pct=d.meta>0?Math.round(d.total/d.meta*100):100;
         if(pct<85){
-          var jatem=(JUST[sk]&&JUST[sk][nome]&&JUST[sk][nome][dk]);
-          if(!jatem)pend.push({sk:sk,nome:nome,dk:dk,pct:pct,tot:d.total,meta:d.meta});
+          var jatem=(JUST[sk]&&JUST[sk][NOME_INSP]&&JUST[sk][NOME_INSP][dk]);
+          if(!jatem) pend.push({sk:sk,nome:NOME_INSP,dk:dk,pct:pct,tot:d.total,meta:d.meta});
         }
       });
     });
-  });
+  }catch(e){ console.error("getPendentes erro:",e); }
   pend.sort(function(a,b){return a.dk.localeCompare(b.dk);});
   return pend;
 }
@@ -1041,52 +1044,66 @@ function getPendentes(){
 function mostrarBloqueio(pend){
   var p=pend[0];
   var el=document.getElementById("content");
-  el.innerHTML='<div style="max-width:500px;margin:2rem auto;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;">'
+  var resto=pend.length>1?'<div style="font-size:11px;color:#718096;margin-bottom:1rem;">Ainda há mais '+(pend.length-1)+' justificativa(s) pendente(s) após esta.</div>':'';
+  el.innerHTML=
+    '<div style="max-width:500px;margin:2rem auto;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;">'
     +'<div style="background:#FEF2F2;border-radius:8px;padding:1rem;margin-bottom:1.5rem;">'
-    +'<div style="font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.25rem">Justificativa pendente</div>'
-    +'<div style="font-size:13px;color:#7F1D1D;">'+p.nome+' ficou com <strong>'+p.pct+'%</strong> da meta no dia <strong>'+fD(p.dk)+'</strong> ('+p.tot+'/'+p.meta+' inspecoes).</div>'
+    +'<div style="font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.25rem;">Justificativa obrigatória</div>'
+    +'<div style="font-size:13px;color:#7F1D1D;">Você ficou com <strong>'+p.pct+'%</strong> da meta no dia <strong>'+fD(p.dk)+'</strong> ('+p.tot+'/'+p.meta+' inspeções).</div>'
     +'</div>'
     +'<div style="font-size:13px;font-weight:700;color:#1A202C;margin-bottom:.5rem;">Qual o motivo do resultado abaixo de 85%?</div>'
     +'<textarea id="jtexto" rows="4" placeholder="Descreva o motivo..." style="width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:1rem;"></textarea>'
-    +'<div style="font-size:11px;color:#718096;margin-bottom:1rem;">'+( pend.length>1?'Ainda há mais '+(pend.length-1)+' justificativa(s) pendente(s) após esta.':'' )+'</div>'
-    +'<button onclick="salvarJust(''+p.sk+'',''+p.nome+'',''+p.dk+'')" style="width:100%;padding:11px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Registrar justificativa</button>'
+    +resto
+    +'<button id="jbtn" style="width:100%;padding:11px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Registrar justificativa</button>'
     +'</div>';
   document.getElementById("nfo").textContent="Justificativa pendente";
+  document.getElementById("jbtn").addEventListener("click", function(){
+    salvarJust(p.sk, p.nome, p.dk);
+  });
 }
 
 async function salvarJust(sk,nome,dk){
   var texto=document.getElementById("jtexto").value.trim();
   if(!texto){alert("Por favor, descreva o motivo.");return;}
-  var r=await fetch("/api/justificativa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setor:sk,colaborador:nome,data:dk,texto:texto})});
-  var d=await r.json();
-  if(d.ok){
-    if(!JUST[sk])JUST[sk]={};
-    if(!JUST[sk][nome])JUST[sk][nome]={};
-    JUST[sk][nome][dk]=texto;
-    var pend=getPendentes();
-    if(pend.length)mostrarBloqueio(pend);
-    else iniciarPainel();
-  }
+  try{
+    var r=await fetch("/api/justificativa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setor:sk,colaborador:nome,data:dk,texto:texto})});
+    var d=await r.json();
+    if(d.ok){
+      if(!JUST[sk])JUST[sk]={};
+      if(!JUST[sk][nome])JUST[sk][nome]={};
+      JUST[sk][nome][dk]=texto;
+      var pend=getPendentes();
+      if(pend.length) mostrarBloqueio(pend);
+      else iniciarPainel();
+    }
+  }catch(e){ alert("Erro ao salvar. Tente novamente."); }
 }
 
 function iniciarPainel(){
   var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
   document.getElementById("nfo").textContent=n+" dias registrados";
   buildTabs();
-  if(TEM_TODOS)rTodos();else if(SK.length)rSetor(SK[0]);
+  if(TEM_TODOS) rTodos();
+  else if(SK.length) rSetor(SK[0]);
 }
 
 async function loadDB(){
   try{
-    var r1=await fetch("/api/data"); DB=await r1.json();
-    var r2=await fetch("/api/justificativas"); JUST=await r2.json();
+    var r1=await fetch("/api/data");
+    DB=await r1.json();
+    var r2=await fetch("/api/justificativas");
+    JUST=await r2.json();
     var pend=getPendentes();
-    if(pend.length&&!TEM_TODOS){
+    if(pend.length){
       mostrarBloqueio(pend);
     } else {
       iniciarPainel();
     }
-  }catch(e){document.getElementById("nfo").textContent="Erro ao carregar";}
+  }catch(e){
+    console.error("loadDB erro:",e);
+    document.getElementById("nfo").textContent="Erro ao carregar";
+    document.getElementById("content").innerHTML='<div class="empty">Erro ao carregar dados. Recarregue a página.</div>';
+  }
 }
 loadDB();
 </script>
