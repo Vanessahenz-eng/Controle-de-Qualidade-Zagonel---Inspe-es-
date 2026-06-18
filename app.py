@@ -15,6 +15,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
 
 # Usuários do sistema — senhas configuráveis via variáveis de ambiente no Render
 USUARIOS = {
+    # Admin — acesso total a todos os setores
+    'bruno':    {'senha': os.environ.get('PASS_BRUNO',    'Bruno@2026'),    'nome': 'Bruno',    'setores': ['B2-03','B1-01','Injecao']},
     # Encarregado — vê todos os setores (somente visualização)
     'luciano':  {'senha': os.environ.get('PASS_LUCIANO',  'Luciano@2026'),  'nome': 'Luciano',  'setores': ['B2-03','B1-01','Injecao']},
     # Apoio B2-03
@@ -892,11 +894,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background
   </div>
 </div>
 <div class="main">
-  <div class="tabs" id="tabs"></div>
-  <div id="pg-todos" class="pg on"><div id="c-todos"><div class="empty">Carregando...</div></div></div>
-  <div id="pg-B2-03" class="pg"><div id="c-B2-03"></div></div>
-  <div id="pg-B1-01" class="pg"><div id="c-B1-01"></div></div>
-  <div id="pg-Injecao" class="pg"><div id="c-Injecao"></div></div>
+  <div id="content">
+    <div class="tabs" id="tabs"></div>
+    <div id="pg-todos" class="pg on"><div id="c-todos"><div class="empty">Carregando...</div></div></div>
+    <div id="pg-B2-03" class="pg"><div id="c-B2-03"></div></div>
+    <div id="pg-B1-01" class="pg"><div id="c-B1-01"></div></div>
+    <div id="pg-Injecao" class="pg"><div id="c-Injecao"></div></div>
+  </div>
 </div>
 <script>
 var DB={},SK=""" + setores_js + """,SN=""" + sn_js + """,SC=""" + sc_js + """,TEM_TODOS=""" + ('true' if tem_todos else 'false') + """;
@@ -1022,6 +1026,9 @@ function getPendentes(){
 
 function mostrarBloqueio(pend){
   var p=pend[0];
+  // Esconder tabs e páginas, mostrar apenas o formulário
+  document.getElementById("tabs").style.display="none";
+  document.querySelectorAll(".pg").forEach(function(el){el.style.display="none";});
   var el=document.getElementById("content");
   var msg=pend.length>1?" (mais "+(pend.length-1)+" pendente(s) após esta)":"";
   el.innerHTML=
@@ -1056,6 +1063,9 @@ async function salvarJust(sk,nome,dk){
 }
 
 function iniciarPainel(){
+  // Restaurar visibilidade das tabs e páginas
+  document.getElementById("tabs").style.display="";
+  document.querySelectorAll(".pg").forEach(function(el){el.style.display="";});
   var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
   document.getElementById("nfo").textContent=n+" dias registrados";
   buildTabs();
