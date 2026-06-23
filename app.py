@@ -604,9 +604,11 @@ async function delDay(sk,dk){
   await loadDB();rDL();
 }
 
+var JUST={}, TEM_TODOS=true;
 async function loadDB(){
   try{
     var r=await fetch('/api/data');DB=await r.json();
+    var rj=await fetch('/api/justificativas');JUST=await rj.json();
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
     document.getElementById('nfo').textContent=n+' dias registrados';
     rAll();
