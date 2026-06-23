@@ -450,7 +450,7 @@ function bCard(nome,d,sk,dk){
     h+='</div>';
   }
   // Exibir justificativa para gestores (TEM_TODOS) quando abaixo de 85%
-  if(TEM_TODOS && pct<85 && sk && dk){
+  if(typeof TEM_TODOS!=="undefined" && TEM_TODOS && pct<85 && sk && dk){
     var jtxt=JUST[sk]&&JUST[sk][nome]&&JUST[sk][nome][dk]?JUST[sk][nome][dk]:null;
     if(jtxt){
       h+='<div style="border-top:1px solid #FCA5A5;margin-top:.5rem;padding:.5rem;background:#FEF2F2;border-radius:0 0 10px 10px;font-size:11px;">';
@@ -481,7 +481,7 @@ function bSetor(sk,dk){
   if(nat>0)h+='<span style="color:var(--am)">'+nat+' atingiu</span><br>';
   if(nno>0)h+='<span style="color:var(--rd)">'+nno+' abaixo</span>';
   h+='</div></div></div><div class="cg">';
-  col.forEach(function(n){ h+=bCard(n,sd[n]); });
+  col.forEach(function(n){ h+=bCard(n,sd[n],sk,dk); });
   h+='</div></div>';
   return h;
 }
