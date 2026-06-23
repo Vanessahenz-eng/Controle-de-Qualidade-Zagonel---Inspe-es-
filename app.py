@@ -1020,8 +1020,11 @@ function getPendentes(){
   if(TEM_TODOS) return [];
   var pend=[];
   try{
+    var limite=new Date(); limite.setDate(limite.getDate()-7);
+    var limiteStr=limite.getFullYear()+'-'+String(limite.getMonth()+1).padStart(2,'0')+'-'+String(limite.getDate()).padStart(2,'0');
     SK.forEach(function(sk){
       Object.keys(DB[sk]||{}).forEach(function(dk){
+        if(dk<limiteStr) return;
         var colab=(DB[sk][dk])||{};
         if(!colab[NOME_INSP]) return;
         var d=colab[NOME_INSP];
@@ -1073,9 +1076,15 @@ async function salvarJust(sk,nome,dk){
     var r=await fetch("/api/justificativa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setor:sk,colaborador:nome,data:dk,texto:texto})});
     var d=await r.json();
     if(d.ok){
+      // Atualizar JUST local
       if(!JUST[sk])JUST[sk]={};
       if(!JUST[sk][nome])JUST[sk][nome]={};
       JUST[sk][nome][dk]=texto;
+      // Recarregar justificativas do servidor para garantir persistência
+      try{
+        var r2=await fetch("/api/justificativas");
+        JUST=await r2.json();
+      }catch(e2){}
       var pend=getPendentes();
       if(pend.length){
         mostrarBloqueio(pend);
