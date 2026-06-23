@@ -1026,28 +1026,37 @@ function getPendentes(){
 
 function mostrarBloqueio(pend){
   var p=pend[0];
-  // Esconder tabs e páginas, mostrar apenas o formulário
-  document.getElementById("tabs").style.display="none";
-  document.querySelectorAll(".pg").forEach(function(el){el.style.display="none";});
-  var el=document.getElementById("content");
-  var msg=pend.length>1?" (mais "+(pend.length-1)+" pendente(s) após esta)":"";
-  el.innerHTML=
-    "<div style='max-width:500px;margin:2rem auto;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;'>"
+  var nfo=document.getElementById("nfo");
+  if(nfo) nfo.textContent="Justificativa pendente";
+
+  // Criar overlay de justificativa sobre tudo
+  var overlay=document.getElementById("joverlay");
+  if(!overlay){
+    overlay=document.createElement("div");
+    overlay.id="joverlay";
+    overlay.style.cssText="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(240,244,248,.97);z-index:999;display:flex;align-items:center;justify-content:center;";
+    document.body.appendChild(overlay);
+  }
+  var msg=pend.length>1?"<div style='font-size:11px;color:#718096;margin-bottom:1rem;'>Ainda há mais "+(pend.length-1)+" justificativa(s) pendente(s) após esta.</div>":"";
+  overlay.innerHTML=
+    "<div style='max-width:500px;width:90%;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;box-shadow:0 8px 32px rgba(0,0,0,.1);'>"
     +"<div style='background:#FEF2F2;border-radius:8px;padding:1rem;margin-bottom:1.5rem;'>"
-    +"<div style='font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.25rem;'>Justificativa obrigatória</div>"
-    +"<div style='font-size:13px;color:#7F1D1D;'>Você ficou com <strong>"+p.pct+"%</strong> da meta no dia <strong>"+fD(p.dk)+"</strong> ("+p.tot+"/"+p.meta+" inspeções)"+msg+".</div>"
+    +"<div style='font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.4rem;'>Justificativa obrigatória</div>"
+    +"<div style='font-size:13px;color:#7F1D1D;'>Você ficou com <strong>"+p.pct+"%</strong> da meta no dia <strong>"+fD(p.dk)+"</strong><br>("+p.tot+"/"+p.meta+" inspeções realizadas).</div>"
     +"</div>"
     +"<div style='font-size:13px;font-weight:700;color:#1A202C;margin-bottom:.5rem;'>Qual o motivo do resultado abaixo de 85%?</div>"
-    +"<textarea id='jtexto' rows='4' placeholder='Descreva o motivo...' style='width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:1rem;'></textarea>"
-    +"<button id='jbtn' style='width:100%;padding:11px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;'>Registrar justificativa</button>"
+    +"<textarea id='jtexto' rows='4' placeholder='Descreva o motivo aqui...' style='width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:.75rem;'></textarea>"
+    +msg
+    +"<button id='jbtn' style='width:100%;padding:12px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;'>Registrar justificativa</button>"
     +"</div>";
-  document.getElementById("nfo").textContent="Justificativa pendente";
   document.getElementById("jbtn").onclick=function(){salvarJust(p.sk,p.nome,p.dk);};
 }
 
 async function salvarJust(sk,nome,dk){
   var texto=document.getElementById("jtexto").value.trim();
   if(!texto){alert("Por favor, descreva o motivo.");return;}
+  var btn=document.getElementById("jbtn");
+  if(btn){btn.disabled=true;btn.textContent="Salvando...";}
   try{
     var r=await fetch("/api/justificativa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setor:sk,colaborador:nome,data:dk,texto:texto})});
     var d=await r.json();
@@ -1056,18 +1065,29 @@ async function salvarJust(sk,nome,dk){
       if(!JUST[sk][nome])JUST[sk][nome]={};
       JUST[sk][nome][dk]=texto;
       var pend=getPendentes();
-      if(pend.length) mostrarBloqueio(pend);
-      else iniciarPainel();
+      if(pend.length){
+        mostrarBloqueio(pend);
+      } else {
+        var overlay=document.getElementById("joverlay");
+        if(overlay) overlay.remove();
+        iniciarPainel();
+      }
+    } else {
+      alert("Erro ao salvar: "+(d.error||"tente novamente."));
+      if(btn){btn.disabled=false;btn.textContent="Registrar justificativa";}
     }
-  }catch(e){alert("Erro ao salvar.");}
+  }catch(e){
+    alert("Erro de conexão. Tente novamente.");
+    if(btn){btn.disabled=false;btn.textContent="Registrar justificativa";}
+  }
 }
 
 function iniciarPainel(){
-  // Restaurar visibilidade das tabs e páginas
-  document.getElementById("tabs").style.display="";
-  document.querySelectorAll(".pg").forEach(function(el){el.style.display="";});
+  var overlay=document.getElementById("joverlay");
+  if(overlay) overlay.remove();
   var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
-  document.getElementById("nfo").textContent=n+" dias registrados";
+  var nfo=document.getElementById("nfo");
+  if(nfo) nfo.textContent=n+" dias registrados";
   buildTabs();
   if(TEM_TODOS)rTodos();else if(SK.length)rSetor(SK[0]);
 }
