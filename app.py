@@ -427,7 +427,7 @@ function fDur(m){ if(m==null||isNaN(m))return'--'; return Math.floor(m)+'min '+p
 function cl(p,t){ if(!t)return'em'; if(p<85)return'no'; if(p<=100)return'at'; return'sv'; }
 function pt(c){ return c==='sv'?'Superou':c==='at'?'Atingiu a meta':c==='no'?'Nao atingiu':'Sem dados'; }
 
-function bCard(nome,d){
+function bCard(nome,d,sk,dk){
   var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
   var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
   var h='<div class="card '+c+'">';
@@ -448,6 +448,17 @@ function bCard(nome,d){
       h+='<div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:var(--mu)">'+label+'</span><span style="font-weight:600;">'+e[1]+'</span></div>';
     });
     h+='</div>';
+  }
+  // Exibir justificativa para gestores (TEM_TODOS) quando abaixo de 85%
+  if(TEM_TODOS && pct<85 && sk && dk){
+    var jtxt=JUST[sk]&&JUST[sk][nome]&&JUST[sk][nome][dk]?JUST[sk][nome][dk]:null;
+    if(jtxt){
+      h+='<div style="border-top:1px solid #FCA5A5;margin-top:.5rem;padding:.5rem;background:#FEF2F2;border-radius:0 0 10px 10px;font-size:11px;">';
+      h+='<div style="font-weight:700;color:#991B1B;margin-bottom:2px;">Justificativa:</div>';
+      h+='<div style="color:#7F1D1D;">'+jtxt+'</div></div>';
+    } else {
+      h+='<div style="border-top:1px solid #FCA5A5;margin-top:.5rem;padding:.5rem .75rem;font-size:11px;color:#991B1B;font-weight:600;">&#9888; Justificativa pendente</div>';
+    }
   }
   h+='</div>';
   return h;
@@ -955,7 +966,7 @@ function bSetor(sk,dk){
   if(nat>0)h+='<span style="color:var(--am)">'+nat+' atingiu</span><br>';
   if(nno>0)h+='<span style="color:var(--rd)">'+nno+' abaixo</span>';
   h+='</div></div></div><div class="cg">';
-  col.forEach(function(n){h+=bCard(n,sd[n]);});
+  col.forEach(function(n){h+=bCard(n,sd[n],sk,dk);});
   return h+"</div></div>";
 }
 function getDias(sk){
@@ -1285,7 +1296,7 @@ function bSetor(sk,dk){
   if(nat>0)h+="<span style=color:var(--am)>"+nat+" atingiu</span><br>";
   if(nno>0)h+="<span style=color:var(--rd)>"+nno+" abaixo</span>";
   h+="</div></div></div><div class=cg>";
-  col.forEach(function(n){h+=bCard(n,sd[n]);});
+  col.forEach(function(n){h+=bCard(n,sd[n],sk,dk);});
   h+="</div></div>";return h;
 }
 function render(dk){
