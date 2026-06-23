@@ -759,6 +759,18 @@ loadDB();
 if __name__ == '__main__':
     app.run(debug=True)
 
+@app.route('/api/me')
+def api_me():
+    if not session.get('usuario'):
+        return jsonify({'error': 'Nao autenticado'}), 401
+    usuario = session.get('usuario', '')
+    info = USUARIOS.get(usuario, {})
+    return jsonify({
+        'nome': info.get('nome', usuario),
+        'setores': info.get('setores', []),
+        'tem_todos': len(info.get('setores', [])) > 1
+    })
+
 @app.route('/api/justificativas')
 def api_justificativas():
     db = load_data()
@@ -1002,7 +1014,7 @@ function buildTabs(){
     tabs.appendChild(b);
   });
 }
-var JUST={}, NOME_INSP=JSON.parse('"" + nome_usuario + ""');
+var JUST={}, _SK='', _DK='', NOME_INSP='', TEM_TODOS=false;
 
 function getPendentes(){
   if(TEM_TODOS) return [];
@@ -1094,15 +1106,22 @@ function iniciarPainel(){
 
 async function loadDB(){
   try{
+    var rm=await fetch("/api/me"); var me=await rm.json();
+    if(me.error){window.location="/login";return;}
+    NOME_INSP=me.nome;
+    TEM_TODOS=me.tem_todos;
+    SK=me.setores;
     var r1=await fetch("/api/data"); DB=await r1.json();
     var r2=await fetch("/api/justificativas"); JUST=await r2.json();
     var pend=getPendentes();
     if(pend.length) mostrarBloqueio(pend);
     else iniciarPainel();
   }catch(e){
-    console.error(e);
-    document.getElementById("content").innerHTML="<div class=\"empty\">Erro ao carregar. Recarregue a página.</div>";
-    document.getElementById("nfo").textContent="Erro";
+    console.error("Erro loadDB:",e);
+    var c=document.getElementById("content");
+    if(c) c.innerHTML='<div class="empty">Erro ao carregar dados. Recarregue a página.</div>';
+    var n=document.getElementById("nfo");
+    if(n) n.textContent="Erro ao carregar";
   }
 }
 loadDB();
