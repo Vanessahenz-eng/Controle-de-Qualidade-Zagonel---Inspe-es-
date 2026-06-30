@@ -220,8 +220,8 @@ def parse_xlsx(file_bytes, setor_key):
     for o in by_code.values():
         if not o['at'] and o.get('checklist'):
             o['at'] = o['checklist']
-        # Para Injeção: aceitar inspeções sem atividade — registrar como "Sem máquina informada"
-        if setor_key == 'Injecao' and not o['at'] and o.get('ex'):
+        # Para Injeção/B1-01: aceitar inspeções sem atividade — registrar como "Sem máquina informada"
+        if setor_key in ('Injecao', 'B1-01') and not o['at'] and o.get('ex'):
             o['at'] = 'Sem máquina informada'
 
     inspecoes = []
