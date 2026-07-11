@@ -9,6 +9,8 @@ app = Flask(__name__)
 DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+CF_API_KEY   = os.environ.get('CHECKLISTFACIL_API_KEY', '')
+CF_API_URL   = 'https://api.checklistfacil.com.br/v2'
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
 app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
@@ -121,6 +123,100 @@ def load_data():
                     base[setor] = {}
                 base[setor].update(dias)
     return base
+
+
+def cf_headers():
+    return {'Authorization': f'Bearer {CF_API_KEY}', 'Content-Type': 'application/json'}
+
+def cf_buscar_avaliacoes(data_inicio, data_fim):
+    try:
+        r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
+            params={'startDate': data_inicio, 'endDate': data_fim, 'status': 'finished', 'limit': 500},
+            timeout=30)
+        return r.json() if r.status_code == 200 else None
+    except Exception as e:
+        print(f'Erro CF: {e}'); return None
+
+def cf_buscar_resultado(eval_id):
+    try:
+        r = requests.get(f'{CF_API_URL}/evaluations/{eval_id}/results', headers=cf_headers(), timeout=30)
+        return r.json() if r.status_code == 200 else None
+    except: return None
+
+def cf_sincronizar_dia(data_str):
+    if not CF_API_KEY:
+        return None, 'CHECKLISTFACIL_API_KEY nao configurada'
+    resp = cf_buscar_avaliacoes(data_str, data_str)
+    if resp is None:
+        return None, 'Erro ao acessar API do Checklist Facil'
+    avaliacoes = resp.get('data', resp) if isinstance(resp, dict) else resp
+    if not avaliacoes:
+        return {}, 'Nenhuma avaliacao encontrada para esta data'
+
+    db = load_data()
+    total_processado = 0
+    setores_atualizados = set()
+
+    for aval in avaliacoes:
+        eval_id = aval.get('id')
+        items_resp = cf_buscar_resultado(eval_id)
+        if not items_resp: continue
+        items = items_resp.get('data', items_resp) if isinstance(items_resp, dict) else items_resp
+
+        dados = {}
+        for item in items:
+            nome_item = str(item.get('name', '')).strip()
+            resp_item = ''
+            ans = item.get('answer', {})
+            if isinstance(ans, dict):
+                resp_item = str(ans.get('text', '') or ans.get('value', '') or '').strip()
+            elif isinstance(ans, str):
+                resp_item = ans.strip()
+            if nome_item and resp_item:
+                dados[nome_item] = resp_item
+
+        executor = None
+        for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor']:
+            if campo in dados:
+                executor = dados[campo]; break
+
+        atividade = None
+        for campo in ['Confirme aqui o nome da maquina ou atividade', 'Etapa Auditada', 'Maquina', 'Máquina']:
+            if campo in dados:
+                atividade = dados[campo]; break
+
+        checklist_nome = str(aval.get('checklist', {}).get('name', '') or '').upper()
+        setor_key = None
+        if 'B2-03' in checklist_nome or 'APOIO F' in checklist_nome:
+            setor_key = 'B2-03'
+        elif 'B1-01' in checklist_nome or 'CABOS' in checklist_nome or 'PINOS' in checklist_nome:
+            setor_key = 'B1-01'
+        elif 'INJECAO' in checklist_nome or 'INJEC' in checklist_nome or 'PADR' in checklist_nome:
+            setor_key = 'Injecao'
+
+        if not setor_key or not executor: continue
+        nome_norm = norm_name(executor, setor_key)
+        if not nome_norm: continue
+        if not atividade:
+            atividade = aval.get('checklist', {}).get('name', 'Sem atividade')
+
+        meta = SETORES[setor_key]['colaboradores'].get(nome_norm, 0)
+        if data_str not in db[setor_key]:
+            db[setor_key][data_str] = {}
+        if nome_norm not in db[setor_key][data_str]:
+            db[setor_key][data_str][nome_norm] = {'meta': meta, 'total': 0, 'nc': 0, 'teste': 0, 'inspecoes': [], 'tipos': {}}
+
+        db[setor_key][data_str][nome_norm]['total'] += 1
+        db[setor_key][data_str][nome_norm]['inspecoes'].append({
+            'at': atividade, 'ex': nome_norm, 'cf': None, 'tipo': None,
+            'ini': aval.get('startDate'), 'fim': aval.get('endDate'), 'dur': None
+        })
+        setores_atualizados.add(setor_key)
+        total_processado += 1
+
+    if setores_atualizados:
+        save_data(db)
+    return {'setores': list(setores_atualizados), 'total': total_processado}, None
 
 def save_data(data):
     try:
@@ -379,7 +475,9 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#FAFAFA}
     <button class="tab" id="tb1" onclick="gt(1)">Apoio B2-03</button>
     <button class="tab" id="tb2" onclick="gt(2)">Apoio B1-01</button>
     <button class="tab" id="tb3" onclick="gt(3)">Injecao</button>
-    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:auto">Importar</button>
+    <button id="syncbtn" onclick="cfSync()" style="margin-left:auto;padding:7px 14px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">&#8635; Sincronizar</button>
+    <span id="synctxt" style="font-size:11px;color:#718096;padding:0 6px;"></span>
+    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:0">Importar</button>
   </div>
   <div id="p0" class="pg on"><div id="c0"><div class="empty">Carregando...</div></div></div>
   <div id="p1" class="pg"><div id="c1"><div class="empty">Sem dados.</div></div></div>
@@ -605,6 +703,37 @@ async function delDay(sk,dk){
 }
 
 var JUST={}, TEM_TODOS=true;
+var CF_SYNC_INTERVAL = null;
+
+async function cfSync(auto){
+  var btn=document.getElementById('syncbtn');
+  var txt=document.getElementById('synctxt');
+  if(btn){btn.disabled=true; btn.textContent='Sincronizando...';}
+  if(txt) txt.textContent='';
+  try{
+    var hoje=new Date();
+    var dk=hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+    var r=await fetch('/api/cf/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:dk})});
+    var d=await r.json();
+    if(d.ok){
+      var res=d.resultado||{};
+      var msg=auto?'Auto: ':'';
+      if(txt) txt.textContent=msg+'Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' ('+( res.total||0)+' insp)';
+      await loadDB();
+    } else {
+      if(txt) txt.textContent='Erro: '+(d.erro||'falha na sincronização');
+    }
+  }catch(e){
+    if(txt) txt.textContent='Erro de conexão';
+  }
+  if(btn){btn.disabled=false; btn.textContent='↻ Sincronizar';}
+}
+
+function iniciarAutoSync(intervalo_min){
+  if(CF_SYNC_INTERVAL) clearInterval(CF_SYNC_INTERVAL);
+  CF_SYNC_INTERVAL=setInterval(function(){ cfSync(true); }, intervalo_min*60*1000);
+}
+
 async function loadDB(){
   try{
     var r=await fetch('/api/data');DB=await r.json();
@@ -613,6 +742,8 @@ async function loadDB(){
     document.getElementById('nfo').textContent=n+' dias registrados';
     rAll();
   }catch(e){document.getElementById('nfo').textContent='Erro ao carregar';}
+  // Iniciar auto-sync a cada 5 minutos
+  iniciarAutoSync(5);
 }
 
 loadDB();
@@ -771,6 +902,31 @@ loadDB();
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+@app.route('/api/cf/sync', methods=['POST'])
+def api_cf_sync():
+    body = request.get_json() or {}
+    data_str = body.get('data')
+    if not data_str:
+        from datetime import date
+        data_str = date.today().strftime('%Y-%m-%d')
+    resultado, erro = cf_sincronizar_dia(data_str)
+    if erro and not resultado:
+        return jsonify({'ok': False, 'erro': erro}), 400
+    return jsonify({'ok': True, 'resultado': resultado, 'aviso': erro})
+
+@app.route('/api/cf/status')
+def api_cf_status():
+    if not CF_API_KEY:
+        return jsonify({'ok': False, 'erro': 'API key nao configurada'})
+    try:
+        from datetime import date
+        hoje = date.today().strftime('%Y-%m-%d')
+        r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
+            params={'startDate': hoje, 'endDate': hoje, 'limit': 1}, timeout=10)
+        return jsonify({'ok': r.status_code == 200, 'status_code': r.status_code})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
 
 @app.route('/api/me')
 def api_me():
