@@ -133,7 +133,11 @@ def cf_buscar_avaliacoes(data_inicio, data_fim):
         r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
             params={'startDate': data_inicio, 'endDate': data_fim, 'status': 'finished', 'limit': 500},
             timeout=30)
-        return r.json() if r.status_code == 200 else None
+        print(f'CF status: {r.status_code} | url: {CF_API_URL}/evaluations')
+        if r.status_code == 200:
+            return r.json()
+        print(f'CF erro body: {r.text[:300]}')
+        return None
     except Exception as e:
         print(f'Erro CF: {e}'); return None
 
@@ -148,7 +152,10 @@ def cf_sincronizar_dia(data_str):
         return None, 'CHECKLISTFACIL_API_KEY nao configurada'
     resp = cf_buscar_avaliacoes(data_str, data_str)
     if resp is None:
-        return None, 'Erro ao acessar API do Checklist Facil'
+        if not CF_API_KEY:
+            return None, 'API key nao configurada no Render'
+        return None, f'Erro ao acessar API do Checklist Facil (URL: {CF_API_URL}/evaluations)'
+    
     avaliacoes = resp.get('data', resp) if isinstance(resp, dict) else resp
     if not avaliacoes:
         return {}, 'Nenhuma avaliacao encontrada para esta data'
@@ -918,15 +925,21 @@ def api_cf_sync():
 @app.route('/api/cf/status')
 def api_cf_status():
     if not CF_API_KEY:
-        return jsonify({'ok': False, 'erro': 'API key nao configurada'})
+        return jsonify({'ok': False, 'erro': 'API key nao configurada no Render (CHECKLISTFACIL_API_KEY)'})
     try:
         from datetime import date
         hoje = date.today().strftime('%Y-%m-%d')
         r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
             params={'startDate': hoje, 'endDate': hoje, 'limit': 1}, timeout=10)
-        return jsonify({'ok': r.status_code == 200, 'status_code': r.status_code})
+        return jsonify({
+            'ok': r.status_code == 200,
+            'status_code': r.status_code,
+            'url': f'{CF_API_URL}/evaluations',
+            'key_preview': CF_API_KEY[:8]+'...' if CF_API_KEY else None,
+            'body_preview': r.text[:200]
+        })
     except Exception as e:
-        return jsonify({'ok': False, 'erro': str(e)})
+        return jsonify({'ok': False, 'erro': str(e), 'url': CF_API_URL})
 
 @app.route('/api/me')
 def api_me():
