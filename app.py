@@ -10,7 +10,7 @@ DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 CF_API_KEY   = os.environ.get('CHECKLISTFACIL_API_KEY', '')
-CF_API_URL   = 'https://api.checklistfacil.com.br/v2'
+CF_API_URL   = 'https://integration.checklistfacil.com.br'
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
 app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
@@ -130,7 +130,7 @@ def cf_headers():
 
 def cf_buscar_avaliacoes(data_inicio, data_fim):
     try:
-        r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
+        r = requests.get(f'{CF_API_URL}/v1/evaluations', headers=cf_headers(),
             params={'startDate': data_inicio, 'endDate': data_fim, 'status': 'finished', 'limit': 500},
             timeout=30)
         print(f'CF status: {r.status_code} | url: {CF_API_URL}/evaluations')
@@ -143,7 +143,7 @@ def cf_buscar_avaliacoes(data_inicio, data_fim):
 
 def cf_buscar_resultado(eval_id):
     try:
-        r = requests.get(f'{CF_API_URL}/evaluations/{eval_id}/results', headers=cf_headers(), timeout=30)
+        r = requests.get(f'{CF_API_URL}/v1/evaluations/{eval_id}/results', headers=cf_headers(), timeout=30)
         return r.json() if r.status_code == 200 else None
     except: return None
 
@@ -928,7 +928,7 @@ def api_cf_status():
         return jsonify({'ok': False, 'erro': 'API key nao configurada no Render (CHECKLISTFACIL_API_KEY)'})
     from datetime import date
     hoje = date.today().strftime('%Y-%m-%d')
-    url = f'{CF_API_URL}/evaluations'
+    url = f'{CF_API_URL}/v1/evaluations'
     params = {'startDate': hoje, 'endDate': hoje, 'limit': 1}
     resultados = {}
     # Testar diferentes formatos de autenticação
