@@ -926,20 +926,30 @@ def api_cf_sync():
 def api_cf_status():
     if not CF_API_KEY:
         return jsonify({'ok': False, 'erro': 'API key nao configurada no Render (CHECKLISTFACIL_API_KEY)'})
-    try:
-        from datetime import date
-        hoje = date.today().strftime('%Y-%m-%d')
-        r = requests.get(f'{CF_API_URL}/evaluations', headers=cf_headers(),
-            params={'startDate': hoje, 'endDate': hoje, 'limit': 1}, timeout=10)
-        return jsonify({
-            'ok': r.status_code == 200,
-            'status_code': r.status_code,
-            'url': f'{CF_API_URL}/evaluations',
-            'key_preview': CF_API_KEY[:8]+'...' if CF_API_KEY else None,
-            'body_preview': r.text[:200]
-        })
-    except Exception as e:
-        return jsonify({'ok': False, 'erro': str(e), 'url': CF_API_URL})
+    from datetime import date
+    hoje = date.today().strftime('%Y-%m-%d')
+    url = f'{CF_API_URL}/evaluations'
+    params = {'startDate': hoje, 'endDate': hoje, 'limit': 1}
+    resultados = {}
+    # Testar diferentes formatos de autenticação
+    formatos = {
+        'Bearer':   {'Authorization': f'Bearer {CF_API_KEY}'},
+        'Token':    {'Authorization': f'Token {CF_API_KEY}'},
+        'X-Api-Key': {'X-Api-Key': CF_API_KEY},
+        'apiKey_query': {},  # via query param
+    }
+    for nome, headers in formatos.items():
+        try:
+            p = dict(params)
+            if nome == 'apiKey_query':
+                p['apiKey'] = CF_API_KEY
+            r = requests.get(url, headers=headers, params=p, timeout=10)
+            resultados[nome] = {'status': r.status_code, 'body': r.text[:150]}
+            if r.status_code == 200:
+                return jsonify({'ok': True, 'formato': nome, 'resultados': resultados})
+        except Exception as e:
+            resultados[nome] = {'erro': str(e)}
+    return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
 
 @app.route('/api/me')
 def api_me():
