@@ -925,31 +925,26 @@ def api_cf_sync():
 @app.route('/api/cf/status')
 def api_cf_status():
     if not CF_API_KEY:
-        return jsonify({'ok': False, 'erro': 'API key nao configurada no Render (CHECKLISTFACIL_API_KEY)'})
+        return jsonify({'ok': False, 'erro': 'API key nao configurada (CHECKLISTFACIL_API_KEY)'})
     from datetime import date
     hoje = date.today().strftime('%Y-%m-%d')
-    url = f'{CF_API_URL}/v1/evaluations'
-    params = {'startDate': hoje, 'endDate': hoje, 'limit': 1}
+    headers = {'Authorization': f'Bearer {CF_API_KEY}'}
+    endpoints = [
+        '/v1/evaluations', '/v2/evaluations', '/v3/evaluations', '/v4/evaluations',
+        '/evaluations', '/v1/checklists-applied', '/v3/checklists-applied', '/v4/checklists-applied',
+    ]
     resultados = {}
-    # Testar diferentes formatos de autenticação
-    formatos = {
-        'Bearer':   {'Authorization': f'Bearer {CF_API_KEY}'},
-        'Token':    {'Authorization': f'Token {CF_API_KEY}'},
-        'X-Api-Key': {'X-Api-Key': CF_API_KEY},
-        'apiKey_query': {},  # via query param
-    }
-    for nome, headers in formatos.items():
+    for ep in endpoints:
         try:
-            p = dict(params)
-            if nome == 'apiKey_query':
-                p['apiKey'] = CF_API_KEY
-            r = requests.get(url, headers=headers, params=p, timeout=10)
-            resultados[nome] = {'status': r.status_code, 'body': r.text[:150]}
+            r = requests.get(CF_API_URL+ep, headers=headers,
+                params={'startDate': hoje, 'endDate': hoje, 'limit': 1}, timeout=10)
+            resultados[ep] = {'status': r.status_code, 'body': r.text[:80]}
             if r.status_code == 200:
-                return jsonify({'ok': True, 'formato': nome, 'resultados': resultados})
+                return jsonify({'ok': True, 'endpoint': CF_API_URL+ep, 'resultados': resultados})
         except Exception as e:
-            resultados[nome] = {'erro': str(e)}
+            resultados[ep] = {'erro': str(e)}
     return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
+
 
 @app.route('/api/me')
 def api_me():
