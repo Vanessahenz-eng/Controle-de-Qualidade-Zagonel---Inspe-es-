@@ -10,7 +10,8 @@ DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 CF_API_KEY   = os.environ.get('CHECKLISTFACIL_API_KEY', '')
-CF_API_URL   = 'https://integration.checklistfacil.com.br'
+CF_API_URL         = 'https://integration.checklistfacil.com.br'
+CF_API_ANALYTICS   = 'https://api-analytics.checklistfacil.com.br'
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
 app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
@@ -929,18 +930,26 @@ def api_cf_status():
     from datetime import date
     hoje = date.today().strftime('%Y-%m-%d')
     headers = {'Authorization': f'Bearer {CF_API_KEY}'}
+    # Testar API Analytics (para leitura de registros)
     endpoints = [
-        '/v1/evaluations', '/v2/evaluations', '/v3/evaluations', '/v4/evaluations',
-        '/evaluations', '/v1/checklists-applied', '/v3/checklists-applied', '/v4/checklists-applied',
+        (CF_API_ANALYTICS, '/registers'),
+        (CF_API_ANALYTICS, '/records'),
+        (CF_API_ANALYTICS, '/evaluations'),
+        (CF_API_ANALYTICS, '/checklists-applied'),
+        (CF_API_ANALYTICS, '/v1/registers'),
+        (CF_API_ANALYTICS, '/v1/records'),
+        (CF_API_ANALYTICS, '/v1/evaluations'),
+        (CF_API_URL, '/v3/checklists-applied'),
+        (CF_API_URL, '/v4/checklists-applied'),
     ]
     resultados = {}
-    for ep in endpoints:
+    for base, ep in endpoints:
         try:
-            r = requests.get(CF_API_URL+ep, headers=headers,
-                params={'startDate': hoje, 'endDate': hoje, 'limit': 1}, timeout=10)
-            resultados[ep] = {'status': r.status_code, 'body': r.text[:80]}
+            r = requests.get(base+ep, headers=headers,
+                params={'page': 1, 'limit': 1}, timeout=10)
+            resultados[ep] = {'status': r.status_code, 'body': r.text[:120]}
             if r.status_code == 200:
-                return jsonify({'ok': True, 'endpoint': CF_API_URL+ep, 'resultados': resultados})
+                return jsonify({'ok': True, 'endpoint': base+ep, 'resultados': resultados})
         except Exception as e:
             resultados[ep] = {'erro': str(e)}
     return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
