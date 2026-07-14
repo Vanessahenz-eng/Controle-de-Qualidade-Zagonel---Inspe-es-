@@ -133,8 +133,8 @@ def cf_buscar_avaliacoes(data_inicio, data_fim):
     try:
         url = f'{CF_API_ANALYTICS}/v1/evaluations'
         params = {
-            'startedAt[gte]': f'{data_inicio}T00:00:00',
-            'startedAt[lte]': f'{data_fim}T23:59:59',
+            'startedAt[gte]': data_inicio,
+            'startedAt[lte]': data_fim,
             'status': 6,
             'limit': 1000,
             'page': 1,
@@ -958,8 +958,8 @@ def api_cf_status():
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
     try:
         r = requests.get(url, headers=headers, params={
-            'startedAt[gte]': f'{hoje}T00:00:00',
-            'startedAt[lte]': f'{hoje}T23:59:59',
+            'startedAt[gte]': hoje,
+            'startedAt[lte]': hoje,
             'limit': 1, 'page': 1
         }, timeout=10)
         return jsonify({
