@@ -131,10 +131,16 @@ def cf_headers():
 
 def cf_buscar_avaliacoes(data_inicio, data_fim):
     try:
-        r = requests.get(f'{CF_API_URL}/v1/evaluations', headers=cf_headers(),
-            params={'startDate': data_inicio, 'endDate': data_fim, 'status': 'finished', 'limit': 500},
-            timeout=30)
-        print(f'CF status: {r.status_code} | url: {CF_API_URL}/evaluations')
+        url = f'{CF_API_ANALYTICS}/v1/evaluations'
+        params = {
+            'startedAt[gte]': f'{data_inicio}T00:00:00',
+            'startedAt[lte]': f'{data_fim}T23:59:59',
+            'status': 6,
+            'limit': 1000,
+            'page': 1,
+        }
+        r = requests.get(url, headers=cf_headers(), params=params, timeout=30)
+        print(f'CF status: {r.status_code} | url: {url}')
         if r.status_code == 200:
             return r.json()
         print(f'CF erro body: {r.text[:300]}')
@@ -142,10 +148,17 @@ def cf_buscar_avaliacoes(data_inicio, data_fim):
     except Exception as e:
         print(f'Erro CF: {e}'); return None
 
+
 def cf_buscar_resultado(eval_id):
     try:
-        r = requests.get(f'{CF_API_URL}/v1/evaluations/{eval_id}/results', headers=cf_headers(), timeout=30)
-        return r.json() if r.status_code == 200 else None
+        url = f'{CF_API_ANALYTICS}/v1/evaluations/{eval_id}/items'
+        r = requests.get(url, headers=cf_headers(), timeout=30)
+        if r.status_code == 200:
+            return r.json()
+        # Tentar endpoint alternativo
+        url2 = f'{CF_API_ANALYTICS}/v1/evaluations/{eval_id}'
+        r2 = requests.get(url2, headers=cf_headers(), timeout=30)
+        return r2.json() if r2.status_code == 200 else None
     except: return None
 
 def cf_sincronizar_dia(data_str):
@@ -171,29 +184,41 @@ def cf_sincronizar_dia(data_str):
         if not items_resp: continue
         items = items_resp.get('data', items_resp) if isinstance(items_resp, dict) else items_resp
 
-        dados = {}
-        for item in items:
-            nome_item = str(item.get('name', '')).strip()
-            resp_item = ''
-            ans = item.get('answer', {})
-            if isinstance(ans, dict):
-                resp_item = str(ans.get('text', '') or ans.get('value', '') or '').strip()
-            elif isinstance(ans, str):
-                resp_item = ans.strip()
-            if nome_item and resp_item:
-                dados[nome_item] = resp_item
+        # Tentar extrair executor direto da avaliação (campo user/responsible)
+        executor_direto = None
+        user = aval.get('user') or aval.get('responsible') or aval.get('executor') or {}
+        if isinstance(user, dict):
+            executor_direto = user.get('name') or user.get('username') or user.get('email')
+        elif isinstance(user, str):
+            executor_direto = user
 
-        executor = None
-        for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor']:
-            if campo in dados:
-                executor = dados[campo]; break
+        dados = {}
+        if items:
+            items_list = items.get('data', items) if isinstance(items, dict) else items
+            for item in (items_list if isinstance(items_list, list) else []):
+                nome_item = str(item.get('name', '') or item.get('title', '')).strip()
+                resp_item = ''
+                ans = item.get('answer', item.get('response', {}))
+                if isinstance(ans, dict):
+                    resp_item = str(ans.get('text', '') or ans.get('value', '') or ans.get('label', '') or '').strip()
+                elif isinstance(ans, str):
+                    resp_item = ans.strip()
+                if nome_item and resp_item:
+                    dados[nome_item] = resp_item
+
+        executor = executor_direto
+        if not executor:
+            for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor', 'Nome do executor']:
+                if campo in dados:
+                    executor = dados[campo]; break
 
         atividade = None
         for campo in ['Confirme aqui o nome da maquina ou atividade', 'Etapa Auditada', 'Maquina', 'Máquina']:
             if campo in dados:
                 atividade = dados[campo]; break
 
-        checklist_nome = str(aval.get('checklist', {}).get('name', '') or '').upper()
+        checklist_nome = str(aval.get('checklist', {}).get('name', '') or
+                           aval.get('checklistName', '') or '').upper()
         setor_key = None
         if 'B2-03' in checklist_nome or 'APOIO F' in checklist_nome:
             setor_key = 'B2-03'
@@ -930,29 +955,22 @@ def api_cf_status():
     from datetime import date
     hoje = date.today().strftime('%Y-%m-%d')
     headers = {'Authorization': f'Bearer {CF_API_KEY}'}
-    # Testar API Analytics (para leitura de registros)
-    endpoints = [
-        (CF_API_ANALYTICS, '/registers'),
-        (CF_API_ANALYTICS, '/records'),
-        (CF_API_ANALYTICS, '/evaluations'),
-        (CF_API_ANALYTICS, '/checklists-applied'),
-        (CF_API_ANALYTICS, '/v1/registers'),
-        (CF_API_ANALYTICS, '/v1/records'),
-        (CF_API_ANALYTICS, '/v1/evaluations'),
-        (CF_API_URL, '/v3/checklists-applied'),
-        (CF_API_URL, '/v4/checklists-applied'),
-    ]
-    resultados = {}
-    for base, ep in endpoints:
-        try:
-            r = requests.get(base+ep, headers=headers,
-                params={'page': 1, 'limit': 1}, timeout=10)
-            resultados[ep] = {'status': r.status_code, 'body': r.text[:120]}
-            if r.status_code == 200:
-                return jsonify({'ok': True, 'endpoint': base+ep, 'resultados': resultados})
-        except Exception as e:
-            resultados[ep] = {'erro': str(e)}
-    return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
+    url = f'{CF_API_ANALYTICS}/v1/evaluations'
+    try:
+        r = requests.get(url, headers=headers, params={
+            'startedAt[gte]': f'{hoje}T00:00:00',
+            'startedAt[lte]': f'{hoje}T23:59:59',
+            'limit': 1, 'page': 1
+        }, timeout=10)
+        return jsonify({
+            'ok': r.status_code == 200,
+            'status_code': r.status_code,
+            'endpoint': url,
+            'key_preview': CF_API_KEY[:8]+'...',
+            'body_preview': r.text[:300]
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
 
 
 @app.route('/api/me')
