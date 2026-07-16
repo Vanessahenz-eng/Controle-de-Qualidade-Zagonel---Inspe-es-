@@ -23,6 +23,7 @@ USUARIOS = {
     # Encarregado — vê todos os setores (somente visualização)
     'luciano':  {'senha': os.environ.get('PASS_LUCIANO',  'Luciano@2026'),  'nome': 'Luciano',  'setores': ['B2-03','B1-01','Injecao']},
     # Apoio B2-03
+    'maria':    {'senha': os.environ.get('PASS_MARIA',    'Maria@2026'),    'nome': 'Maria',    'setores': ['B2-03']},
     'juliana':  {'senha': os.environ.get('PASS_JULIANA',  'Juliana@2026'),  'nome': 'Juliana',  'setores': ['B2-03']},
     'sirlei':   {'senha': os.environ.get('PASS_SIRLEI',   'Sirlei@2026'),   'nome': 'Sirlei',   'setores': ['B2-03']},
     'danmari':  {'senha': os.environ.get('PASS_DANMARI',  'Danmari@2026'),  'nome': 'Danmari',  'setores': ['B2-03']},
