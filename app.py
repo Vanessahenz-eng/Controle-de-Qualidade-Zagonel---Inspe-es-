@@ -957,21 +957,25 @@ def api_cf_status():
     hoje = date.today().strftime('%Y-%m-%d')
     headers = {'Authorization': f'Bearer {CF_API_KEY}'}
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    try:
-        r = requests.get(url, headers=headers, params={
-            'startedAt[gte]': hoje,
-            'startedAt[lte]': hoje,
-            'limit': 1, 'page': 1
-        }, timeout=10)
-        return jsonify({
-            'ok': r.status_code == 200,
-            'status_code': r.status_code,
-            'endpoint': url,
-            'key_preview': CF_API_KEY[:8]+'...',
-            'body_preview': r.text[:300]
-        })
-    except Exception as e:
-        return jsonify({'ok': False, 'erro': str(e)})
+    resultados = {}
+    # Testar diferentes formatos de data
+    testes = {
+        'sem_filtro':           {},
+        'YYYY-MM-DD':           {'startedAt[gte]': hoje, 'startedAt[lte]': hoje, 'limit': 1},
+        'DD/MM/YYYY':           {'startedAt[gte]': date.today().strftime('%d/%m/%Y'), 'startedAt[lte]': date.today().strftime('%d/%m/%Y'), 'limit': 1},
+        'ISO_completo':         {'startedAt[gte]': f'{hoje}T00:00:00-03:00', 'startedAt[lte]': f'{hoje}T23:59:59-03:00', 'limit': 1},
+        'timestamp':            {'startedAt[gte]': f'{hoje} 00:00:00', 'startedAt[lte]': f'{hoje} 23:59:59', 'limit': 1},
+        'concludedAt':          {'concludedAt[gte]': hoje, 'concludedAt[lte]': hoje, 'limit': 1},
+    }
+    for nome, params in testes.items():
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=10)
+            resultados[nome] = {'status': r.status_code, 'body': r.text[:120]}
+            if r.status_code == 200:
+                return jsonify({'ok': True, 'formato': nome, 'endpoint': url, 'resultados': resultados})
+        except Exception as e:
+            resultados[e] = {'erro': str(e)}
+    return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
 
 
 @app.route('/api/me')
