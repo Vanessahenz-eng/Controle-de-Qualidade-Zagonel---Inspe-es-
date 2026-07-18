@@ -130,22 +130,37 @@ def load_data():
 def cf_headers():
     return {'Authorization': f'Bearer {CF_API_KEY}', 'Content-Type': 'application/json'}
 
-def cf_buscar_avaliacoes(data_inicio, data_fim):
+def cf_buscar_avaliacoes(data_str):
+    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD)."""
     try:
         url = f'{CF_API_ANALYTICS}/v1/evaluations'
-        params = {
-            'startedAt[gte]': data_inicio,
-            'startedAt[lte]': data_fim,
-            'status': 6,
-            'limit': 1000,
-            'page': 1,
-        }
-        r = requests.get(url, headers=cf_headers(), params=params, timeout=30)
-        print(f'CF status: {r.status_code} | url: {url}')
-        if r.status_code == 200:
-            return r.json()
-        print(f'CF erro body: {r.text[:300]}')
-        return None
+        headers = cf_headers()
+        todas = []
+        page = 1
+        while True:
+            r = requests.get(url, headers=headers,
+                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
+            if r.status_code != 200:
+                print(f'CF erro {r.status_code}: {r.text[:200]}')
+                break
+            resp = r.json()
+            items = resp.get('data', [])
+            if not items:
+                break
+            # Filtrar pelo dia desejado
+            for item in items:
+                started = str(item.get('startedAt', '') or '')
+                concluded = str(item.get('concludedAt', '') or '')
+                if data_str in started or data_str in concluded:
+                    todas.append(item)
+                elif todas:
+                    # Se já achou registros do dia e agora não tem mais, parar
+                    break
+            if len(items) < 1000:
+                break
+            page += 1
+        print(f'CF: {len(todas)} avaliações encontradas para {data_str}')
+        return todas
     except Exception as e:
         print(f'Erro CF: {e}'); return None
 
@@ -165,13 +180,13 @@ def cf_buscar_resultado(eval_id):
 def cf_sincronizar_dia(data_str):
     if not CF_API_KEY:
         return None, 'CHECKLISTFACIL_API_KEY nao configurada'
-    resp = cf_buscar_avaliacoes(data_str, data_str)
+    resp = cf_buscar_avaliacoes(data_str)
     if resp is None:
         if not CF_API_KEY:
             return None, 'API key nao configurada no Render'
         return None, f'Erro ao acessar API do Checklist Facil (URL: {CF_API_URL}/evaluations)'
     
-    avaliacoes = resp.get('data', resp) if isinstance(resp, dict) else resp
+    avaliacoes = resp if isinstance(resp, list) else resp.get('data', [])
     if not avaliacoes:
         return {}, 'Nenhuma avaliacao encontrada para esta data'
 
@@ -181,7 +196,7 @@ def cf_sincronizar_dia(data_str):
 
     for aval in avaliacoes:
         eval_id = aval.get('id')
-        items_resp = cf_buscar_resultado(eval_id)
+        items_resp = cf_buscar_resultado(eval_id) if eval_id else None
         if not items_resp: continue
         items = items_resp.get('data', items_resp) if isinstance(items_resp, dict) else items_resp
 
@@ -955,27 +970,23 @@ def api_cf_status():
         return jsonify({'ok': False, 'erro': 'API key nao configurada (CHECKLISTFACIL_API_KEY)'})
     from datetime import date
     hoje = date.today().strftime('%Y-%m-%d')
-    headers = {'Authorization': f'Bearer {CF_API_KEY}'}
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    resultados = {}
-    # Testar diferentes formatos de data
-    testes = {
-        'sem_filtro':           {},
-        'YYYY-MM-DD':           {'startedAt[gte]': hoje, 'startedAt[lte]': hoje, 'limit': 1},
-        'DD/MM/YYYY':           {'startedAt[gte]': date.today().strftime('%d/%m/%Y'), 'startedAt[lte]': date.today().strftime('%d/%m/%Y'), 'limit': 1},
-        'ISO_completo':         {'startedAt[gte]': f'{hoje}T00:00:00-03:00', 'startedAt[lte]': f'{hoje}T23:59:59-03:00', 'limit': 1},
-        'timestamp':            {'startedAt[gte]': f'{hoje} 00:00:00', 'startedAt[lte]': f'{hoje} 23:59:59', 'limit': 1},
-        'concludedAt':          {'concludedAt[gte]': hoje, 'concludedAt[lte]': hoje, 'limit': 1},
-    }
-    for nome, params in testes.items():
-        try:
-            r = requests.get(url, headers=headers, params=params, timeout=10)
-            resultados[nome] = {'status': r.status_code, 'body': r.text[:120]}
-            if r.status_code == 200:
-                return jsonify({'ok': True, 'formato': nome, 'endpoint': url, 'resultados': resultados})
-        except Exception as e:
-            resultados[e] = {'erro': str(e)}
-    return jsonify({'ok': False, 'key_preview': CF_API_KEY[:8]+'...', 'resultados': resultados})
+    try:
+        r = requests.get(url, headers=cf_headers(),
+            params={'status': 6, 'limit': 3, 'page': 1}, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get('data', [])
+            sample = items[0] if items else {}
+            return jsonify({
+                'ok': True,
+                'total_amostra': len(items),
+                'campos_disponiveis': list(sample.keys()),
+                'exemplo': sample
+            })
+        return jsonify({'ok': False, 'status': r.status_code, 'body': r.text[:200]})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
 
 
 @app.route('/api/me')
