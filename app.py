@@ -1009,6 +1009,50 @@ loadDB();
 if __name__ == '__main__':
     app.run(debug=True)
 
+@app.route('/api/cf/debug')
+def api_cf_debug():
+    """Mostra o que seria sincronizado hoje sem salvar nada."""
+    if not CF_API_KEY:
+        return jsonify({'erro': 'API key nao configurada'})
+    from datetime import date
+    hoje = date.today().strftime('%Y-%m-%d')
+    usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
+    avaliacoes = cf_buscar_avaliacoes(hoje)
+    if not avaliacoes:
+        return jsonify({'ok': False, 'erro': 'Sem avaliacoes hoje'})
+
+    resumo = []
+    sem_setor = []
+    for aval in avaliacoes[:50]:
+        user_id = aval.get('userId')
+        executor = usuarios.get(user_id, f'userId:{user_id}')
+        setor_key = None
+        for sk in SETORES:
+            if norm_name(executor, sk):
+                setor_key = sk; break
+        nome_norm = norm_name(executor, setor_key) if setor_key else None
+        if nome_norm:
+            resumo.append({'executor': executor, 'nome_norm': nome_norm, 'setor': setor_key,
+                          'checklistId': aval.get('checklistId'), 'evaluationId': aval.get('evaluationId')})
+        else:
+            sem_setor.append({'executor': executor, 'userId': user_id,
+                             'checklistId': aval.get('checklistId')})
+
+    from collections import Counter
+    por_setor = Counter(r['setor'] for r in resumo)
+    por_nome = Counter(r['nome_norm'] for r in resumo)
+    executores_desconhecidos = Counter(s['executor'] for s in sem_setor)
+
+    return jsonify({
+        'ok': True,
+        'total_avaliacoes': len(avaliacoes),
+        'reconhecidos': len(resumo),
+        'nao_reconhecidos': len(sem_setor),
+        'por_setor': dict(por_setor),
+        'por_inspetor': dict(por_nome),
+        'executores_desconhecidos': dict(executores_desconhecidos)
+    })
+
 @app.route('/api/cf/sync', methods=['POST'])
 def api_cf_sync():
     body = request.get_json() or {}
