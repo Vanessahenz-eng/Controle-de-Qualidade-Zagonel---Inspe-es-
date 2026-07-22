@@ -166,44 +166,67 @@ def cf_carregar_usuarios():
         return {}
 
 def cf_buscar_avaliacoes(data_str):
-    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD).
-    A API retorna mais recente primeiro, então página 1 tem os dados de hoje."""
-    try:
-        url = f'{CF_API_ANALYTICS}/v1/evaluations'
-        todas = []
-        page = 1
-        while page <= 5:  # Máximo 5 páginas = 5000 avaliações recentes
-            r = requests.get(url, headers=cf_headers(),
+    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD)."""
+    import time
+    url = f'{CF_API_ANALYTICS}/v1/evaluations'
+    headers = cf_headers()
+
+    # Formatos de data a tentar (do mais provável ao menos provável)
+    formatos_data = [
+        {'startedAt[gte]': f'{data_str}T00:00:00Z',
+         'startedAt[lte]': f'{data_str}T23:59:59Z'},
+        {'startedAt[gte]': f'{data_str}T03:00:00Z',   # Meia noite Brasil em UTC
+         'startedAt[lte]': f'{data_str}T26:59:59Z'},
+        {'concludedAt[gte]': f'{data_str}T00:00:00Z',
+         'concludedAt[lte]': f'{data_str}T23:59:59Z'},
+    ]
+
+    for fmt in formatos_data:
+        try:
+            params = {'status': 6, 'limit': 1000, 'page': 1}
+            params.update(fmt)
+            r = requests.get(url, headers=headers, params=params, timeout=30)
+            if r.status_code == 200:
+                items = r.json().get('data', [])
+                print(f'CF: {len(items)} avaliacoes para {data_str} (formato: {list(fmt.keys())[0]})')
+                return items
+            if r.status_code == 429:
+                print(f'CF rate limit (429) - aguardando...')
+                time.sleep(5)
+                r2 = requests.get(url, headers=headers, params=params, timeout=30)
+                if r2.status_code == 200:
+                    items = r2.json().get('data', [])
+                    print(f'CF: {len(items)} avaliacoes (retry ok)')
+                    return items
+        except Exception as e:
+            print(f'Erro CF formato {fmt}: {e}')
+            continue
+
+    # Último recurso: buscar sem filtro e filtrar manualmente por páginas
+    print('CF: usando fallback sem filtro de data')
+    todas = []
+    for page in range(1, 10):
+        try:
+            r = requests.get(url, headers=headers,
                 params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
-            if r.status_code != 200:
-                print(f'CF erro {r.status_code} na página {page}')
-                break
+            if r.status_code != 200: break
             items = r.json().get('data', [])
-            if not items:
-                break
-            achou_dia = False
+            if not items: break
             for item in items:
-                started   = str(item.get('startedAt',   '') or '')[:10]
+                started = str(item.get('startedAt', '') or '')[:10]
                 concluded = str(item.get('concludedAt', '') or '')[:10]
-                # Considerar fuso: UTC-3 → data pode ser +1 dia em UTC
-                from datetime import date, timedelta
-                ontem = (date.fromisoformat(data_str) - timedelta(days=1)).strftime('%Y-%m-%d')
-                amanha = (date.fromisoformat(data_str) + timedelta(days=1)).strftime('%Y-%m-%d')
-                if started == data_str or concluded == data_str or started == amanha:
+                if started == data_str or concluded == data_str:
                     todas.append(item)
-                    achou_dia = True
-            # Se esta página não tem nenhum registro recente, parar
-            if not achou_dia and todas:
+            # Parar se a página mais recente não tem o dia procurado e já vimos dias posteriores
+            datas_pagina = [str(i.get('startedAt','') or '')[:10] for i in items]
+            if any(d > data_str for d in datas_pagina) and not todas:
                 break
-            # Se todos os itens são mais antigos que data_str, parar
-            primeiros = [str(i.get('startedAt','') or '')[:10] for i in items[:5]]
-            if all(d < ontem for d in primeiros if d):
-                break
-            page += 1
-        print(f'CF: {len(todas)} avaliações para {data_str}')
-        return todas
-    except Exception as e:
-        print(f'Erro CF avaliacoes: {e}'); return None
+            if len(items) < 1000: break
+            time.sleep(1)  # Evitar rate limit
+        except Exception as e:
+            print(f'Erro CF pagina {page}: {e}'); break
+    print(f'CF fallback: {len(todas)} avaliacoes para {data_str}')
+    return todas if todas else None
 
 
 def cf_buscar_itens_avaliacao(eval_id):
@@ -1016,35 +1039,20 @@ def api_cf_debug():
         return jsonify({'erro': 'API key nao configurada'})
     from datetime import date, timedelta
     hoje = date.today().strftime('%Y-%m-%d')
+    ontem = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    resultado = {'hoje': hoje, 'ok': True, 'testes': {}}
-
-    # Testar diferentes combinações para encontrar os dados de hoje
-    testes = {
-        'limit3_p1':         {'status': 6, 'limit': 3,  'page': 1},
-        'limit10_p1':        {'status': 6, 'limit': 10, 'page': 1},
-        'limit50_p1':        {'status': 6, 'limit': 50, 'page': 1},
-        'sem_status_limit3': {'limit': 3, 'page': 1},
-        'sort_desc':         {'status': 6, 'limit': 10, 'page': 1, 'sort': 'desc'},
-        'order_desc':        {'status': 6, 'limit': 10, 'page': 1, 'order': 'desc'},
-        'orderBy_started':   {'status': 6, 'limit': 10, 'page': 1, 'orderBy': 'startedAt', 'order': 'desc'},
-    }
-
     try:
-        for nome, params in testes.items():
-            r = requests.get(url, headers=cf_headers(), params=params, timeout=15)
-            if r.status_code != 200:
-                resultado['testes'][nome] = {'status': r.status_code}
-                continue
-            items = r.json().get('data', [])
-            datas = [str(i.get('startedAt','') or '')[:10] for i in items]
-            de_hoje = sum(1 for d in datas if d == hoje)
-            resultado['testes'][nome] = {
-                'status': r.status_code,
-                'count': len(items),
-                'de_hoje': de_hoje,
-                'datas': datas
-            }
-        return jsonify(resultado)
+        # Testar apenas o formato Z que não retornou 422
+        r = requests.get(url, headers=cf_headers(), params={
+            'startedAt[gte]': f'{hoje}T00:00:00Z',
+            'startedAt[lte]': f'{hoje}T23:59:59Z',
+            'status': 6, 'limit': 10
+        }, timeout=15)
+        return jsonify({
+            'ok': r.status_code == 200,
+            'status_code': r.status_code,
+            'hoje': hoje,
+            'body': r.json() if r.status_code == 200 else r.text[:300]
+        })
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
