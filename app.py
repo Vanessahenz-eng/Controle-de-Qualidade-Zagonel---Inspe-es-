@@ -1016,31 +1016,35 @@ def api_cf_debug():
         return jsonify({'erro': 'API key nao configurada'})
     from datetime import date, timedelta
     hoje = date.today().strftime('%Y-%m-%d')
-    ontem = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    resultado = {'hoje': hoje, 'ontem': ontem, 'ok': True, 'paginas': {}}
+    resultado = {'hoje': hoje, 'ok': True, 'testes': {}}
+
+    # Testar diferentes combinações para encontrar os dados de hoje
+    testes = {
+        'limit3_p1':         {'status': 6, 'limit': 3,  'page': 1},
+        'limit10_p1':        {'status': 6, 'limit': 10, 'page': 1},
+        'limit50_p1':        {'status': 6, 'limit': 50, 'page': 1},
+        'sem_status_limit3': {'limit': 3, 'page': 1},
+        'sort_desc':         {'status': 6, 'limit': 10, 'page': 1, 'sort': 'desc'},
+        'order_desc':        {'status': 6, 'limit': 10, 'page': 1, 'order': 'desc'},
+        'orderBy_started':   {'status': 6, 'limit': 10, 'page': 1, 'orderBy': 'startedAt', 'order': 'desc'},
+    }
 
     try:
-        for page in [2, 3, 4]:
-            r = requests.get(url, headers=cf_headers(),
-                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
+        for nome, params in testes.items():
+            r = requests.get(url, headers=cf_headers(), params=params, timeout=15)
             if r.status_code != 200:
-                resultado['paginas'][str(page)] = {'erro': r.status_code}
-                break
+                resultado['testes'][nome] = {'status': r.status_code}
+                continue
             items = r.json().get('data', [])
-            de_hoje  = sum(1 for i in items if str(i.get('startedAt','') or '')[:10] == hoje)
-            de_ontem = sum(1 for i in items if str(i.get('startedAt','') or '')[:10] == ontem)
-            datas = sorted(set(str(i.get('startedAt','') or '')[:10] for i in items if i.get('startedAt')), reverse=True)[:5]
-            resultado['paginas'][str(page)] = {
-                'total': len(items), 'de_hoje': de_hoje,
-                'de_ontem': de_ontem, 'datas_recentes': datas
+            datas = [str(i.get('startedAt','') or '')[:10] for i in items]
+            de_hoje = sum(1 for d in datas if d == hoje)
+            resultado['testes'][nome] = {
+                'status': r.status_code,
+                'count': len(items),
+                'de_hoje': de_hoje,
+                'datas': datas
             }
-            if de_hoje > 0 or de_ontem > 0:
-                resultado['pagina_certa'] = page
-                break
-            if len(items) < 1000:
-                resultado['fim_dos_dados'] = page
-                break
         return jsonify(resultado)
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
