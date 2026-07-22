@@ -1014,12 +1014,18 @@ def api_cf_debug():
     """Mostra o que seria sincronizado hoje sem salvar nada."""
     if not CF_API_KEY:
         return jsonify({'erro': 'API key nao configurada'})
-    from datetime import date
+    from datetime import date, timedelta
     hoje = date.today().strftime('%Y-%m-%d')
+    ontem = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
+    # Testar hoje e ontem
     avaliacoes = cf_buscar_avaliacoes(hoje)
+    data_usada = hoje
     if not avaliacoes:
-        return jsonify({'ok': False, 'erro': 'Sem avaliacoes hoje'})
+        avaliacoes = cf_buscar_avaliacoes(ontem)
+        data_usada = ontem
+    if not avaliacoes:
+        return jsonify({'ok': False, 'erro': f'Sem avaliacoes em {hoje} nem {ontem}'})
 
     resumo = []
     sem_setor = []
@@ -1045,6 +1051,7 @@ def api_cf_debug():
 
     return jsonify({
         'ok': True,
+        'data_usada': data_usada,
         'total_avaliacoes': len(avaliacoes),
         'reconhecidos': len(resumo),
         'nao_reconhecidos': len(sem_setor),
