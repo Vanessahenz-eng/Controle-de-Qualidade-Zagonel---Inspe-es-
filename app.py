@@ -1018,41 +1018,29 @@ def api_cf_debug():
     hoje = date.today().strftime('%Y-%m-%d')
     ontem = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
+    resultado = {'hoje': hoje, 'ontem': ontem, 'ok': True, 'paginas': {}}
 
     try:
-        # Buscar com limit=1000 para alcançar dados recentes
-        r = requests.get(url, headers=cf_headers(),
-            params={'status': 6, 'limit': 1000, 'page': 1}, timeout=30)
-        if r.status_code != 200:
-            return jsonify({'ok': False, 'status': r.status_code, 'body': r.text[:200]})
-        items = r.json().get('data', [])
-        de_hoje   = [i for i in items if str(i.get('startedAt','') or '')[:10] == hoje
-                     or str(i.get('concludedAt','') or '')[:10] == hoje]
-        de_ontem  = [i for i in items if str(i.get('startedAt','') or '')[:10] == ontem
-                     or str(i.get('concludedAt','') or '')[:10] == ontem]
-        ultimas_datas = sorted(set(str(i.get('startedAt','') or '')[:10] for i in items if i.get('startedAt')), reverse=True)[:10]
-
-        # Testar também se existe pivot/sort param
-        usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
-        amostra_hoje = []
-        for i in de_hoje[:3]:
-            uid = i.get('userId')
-            amostra_hoje.append({
-                'evaluationId': i.get('evaluationId'),
-                'startedAt': i.get('startedAt','')[:10],
-                'userId': uid,
-                'nomeUsuario': usuarios.get(uid, f'userId:{uid}')
-            })
-
-        return jsonify({
-            'ok': True,
-            'hoje': hoje,
-            'ontem': ontem,
-            'total_pagina1': len(items),
-            'de_hoje': len(de_hoje),
-            'de_ontem': len(de_ontem),
-            'ultimas_datas_na_pagina': ultimas_datas,
-            'amostra_hoje': amostra_hoje
-        })
+        for page in [2, 3, 4]:
+            r = requests.get(url, headers=cf_headers(),
+                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
+            if r.status_code != 200:
+                resultado['paginas'][str(page)] = {'erro': r.status_code}
+                break
+            items = r.json().get('data', [])
+            de_hoje  = sum(1 for i in items if str(i.get('startedAt','') or '')[:10] == hoje)
+            de_ontem = sum(1 for i in items if str(i.get('startedAt','') or '')[:10] == ontem)
+            datas = sorted(set(str(i.get('startedAt','') or '')[:10] for i in items if i.get('startedAt')), reverse=True)[:5]
+            resultado['paginas'][str(page)] = {
+                'total': len(items), 'de_hoje': de_hoje,
+                'de_ontem': de_ontem, 'datas_recentes': datas
+            }
+            if de_hoje > 0 or de_ontem > 0:
+                resultado['pagina_certa'] = page
+                break
+            if len(items) < 1000:
+                resultado['fim_dos_dados'] = page
+                break
+        return jsonify(resultado)
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
