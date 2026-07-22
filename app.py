@@ -39,6 +39,7 @@ USUARIOS = {
     'kaue':     {'senha': os.environ.get('PASS_KAUE',     'Kaue@2026'),     'nome': 'Kauê',     'setores': ['Injecao']},
     'renata':   {'senha': os.environ.get('PASS_RENATA',   'Renata@2026'),   'nome': 'Renata',   'setores': ['Injecao']},
     'raquel':   {'senha': os.environ.get('PASS_RAQUEL',   'Raquel@2026'),   'nome': 'Raquel',   'setores': ['Injecao']},
+    'analaura': {'senha': os.environ.get('PASS_ANALAURA', 'AnaLaura@2026'), 'nome': 'Ana Laura', 'setores': ['Injecao']},
 }
 
 SETORES = {
@@ -78,6 +79,7 @@ SETORES = {
             # Turno 3 — 00:12 às 05:48 — meta 11
             'Renata':   11,
             'Raquel':   11,
+            'Ana Laura': 11,
         },
         'nomes_map': {
             'kaline':    'Kaline',
@@ -90,6 +92,8 @@ SETORES = {
             'kau':       'Kaue',
             'renata':    'Renata',
             'raquel':    'Raquel',
+            'ana laura': 'Ana Laura',
+            'ana':        'Ana Laura',
         },
         'campo_tipo': 'Tipo de inspeção',
         'tipos_map': {
