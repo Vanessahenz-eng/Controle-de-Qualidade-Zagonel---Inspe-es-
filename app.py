@@ -134,142 +134,195 @@ def load_data():
 def cf_headers():
     return {'Authorization': f'Bearer {CF_API_KEY}', 'Content-Type': 'application/json'}
 
+# Cache de usuários: userId -> nome
+_cf_users_cache = {}
+
+def cf_carregar_usuarios():
+    """Busca todos os usuários do Checklist Fácil e cacheia userId -> nome."""
+    global _cf_users_cache
+    try:
+        url = f'{CF_API_ANALYTICS}/v1/users'
+        page = 1
+        usuarios = {}
+        while True:
+            r = requests.get(url, headers=cf_headers(),
+                params={'limit': 1000, 'page': page}, timeout=30)
+            if r.status_code != 200: break
+            data = r.json()
+            items = data.get('data', [])
+            if not items: break
+            for u in items:
+                uid = u.get('userId') or u.get('id')
+                nome = u.get('name') or u.get('username') or ''
+                if uid and nome:
+                    usuarios[uid] = nome
+            if len(items) < 1000: break
+            page += 1
+        _cf_users_cache = usuarios
+        print(f'CF: {len(usuarios)} usuários carregados')
+        return usuarios
+    except Exception as e:
+        print(f'Erro CF usuarios: {e}')
+        return {}
+
 def cf_buscar_avaliacoes(data_str):
-    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD)."""
+    """Busca avaliações concluídas (status=6) do dia data_str (YYYY-MM-DD)."""
     try:
         url = f'{CF_API_ANALYTICS}/v1/evaluations'
-        headers = cf_headers()
+        # Usar formato ISO completo com timezone
+        params = {
+            'startedAt[gte]': f'{data_str}T00:00:00-03:00',
+            'startedAt[lte]': f'{data_str}T23:59:59-03:00',
+            'status': 6,
+            'limit': 1000,
+            'page': 1,
+        }
         todas = []
         page = 1
         while True:
-            r = requests.get(url, headers=headers,
-                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
+            params['page'] = page
+            r = requests.get(url, headers=cf_headers(), params=params, timeout=30)
             if r.status_code != 200:
-                print(f'CF erro {r.status_code}: {r.text[:200]}')
-                break
-            resp = r.json()
-            items = resp.get('data', [])
-            if not items:
-                break
-            # Filtrar pelo dia desejado
-            for item in items:
-                started = str(item.get('startedAt', '') or '')
-                concluded = str(item.get('concludedAt', '') or '')
-                if data_str in started or data_str in concluded:
-                    todas.append(item)
-                elif todas:
-                    # Se já achou registros do dia e agora não tem mais, parar
-                    break
-            if len(items) < 1000:
-                break
+                # Fallback: buscar sem filtro de data e filtrar manualmente
+                r2 = requests.get(url, headers=cf_headers(),
+                    params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
+                if r2.status_code != 200: break
+                items = r2.json().get('data', [])
+                for item in items:
+                    started = str(item.get('startedAt', '') or '')
+                    concluded = str(item.get('concludedAt', '') or '')
+                    if data_str in started or data_str in concluded:
+                        todas.append(item)
+                if len(items) < 1000: break
+                page += 1
+                continue
+            items = r.json().get('data', [])
+            todas.extend(items)
+            if len(items) < 1000: break
             page += 1
-        print(f'CF: {len(todas)} avaliações encontradas para {data_str}')
+        print(f'CF: {len(todas)} avaliações para {data_str}')
         return todas
     except Exception as e:
-        print(f'Erro CF: {e}'); return None
+        print(f'Erro CF avaliacoes: {e}'); return None
 
-
-def cf_buscar_resultado(eval_id):
-    try:
-        url = f'{CF_API_ANALYTICS}/v1/evaluations/{eval_id}/items'
-        r = requests.get(url, headers=cf_headers(), timeout=30)
-        if r.status_code == 200:
-            return r.json()
-        # Tentar endpoint alternativo
-        url2 = f'{CF_API_ANALYTICS}/v1/evaluations/{eval_id}'
-        r2 = requests.get(url2, headers=cf_headers(), timeout=30)
-        return r2.json() if r2.status_code == 200 else None
-    except: return None
+def cf_buscar_itens_avaliacao(eval_id):
+    """Busca os itens/respostas de uma avaliação específica."""
+    for endpoint in [f'/v1/evaluations/{eval_id}/items',
+                     f'/v1/evaluations/{eval_id}/answers',
+                     f'/v1/evaluations/{eval_id}']:
+        try:
+            r = requests.get(f'{CF_API_ANALYTICS}{endpoint}',
+                headers=cf_headers(), timeout=20)
+            if r.status_code == 200:
+                return r.json()
+        except: continue
+    return None
 
 def cf_sincronizar_dia(data_str):
+    """Sincroniza avaliações do Checklist Fácil para data_str (YYYY-MM-DD)."""
     if not CF_API_KEY:
         return None, 'CHECKLISTFACIL_API_KEY nao configurada'
-    resp = cf_buscar_avaliacoes(data_str)
-    if resp is None:
-        if not CF_API_KEY:
-            return None, 'API key nao configurada no Render'
-        return None, f'Erro ao acessar API do Checklist Facil (URL: {CF_API_URL}/evaluations)'
-    
-    avaliacoes = resp if isinstance(resp, list) else resp.get('data', [])
+
+    # Carregar mapa de usuários
+    usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
+
+    avaliacoes = cf_buscar_avaliacoes(data_str)
+    if avaliacoes is None:
+        return None, 'Erro ao acessar API do Checklist Facil'
     if not avaliacoes:
-        return {}, 'Nenhuma avaliacao encontrada para esta data'
+        return {}, f'Nenhuma avaliacao encontrada para {data_str}'
 
     db = load_data()
     total_processado = 0
     setores_atualizados = set()
 
     for aval in avaliacoes:
-        eval_id = aval.get('id')
-        items_resp = cf_buscar_resultado(eval_id) if eval_id else None
-        if not items_resp: continue
-        items = items_resp.get('data', items_resp) if isinstance(items_resp, dict) else items_resp
+        eval_id   = aval.get('evaluationId')
+        user_id   = aval.get('userId')
+        checklist_id = aval.get('checklistId')
 
-        # Tentar extrair executor direto da avaliação (campo user/responsible)
-        executor_direto = None
-        user = aval.get('user') or aval.get('responsible') or aval.get('executor') or {}
-        if isinstance(user, dict):
-            executor_direto = user.get('name') or user.get('username') or user.get('email')
-        elif isinstance(user, str):
-            executor_direto = user
+        # Nome do executor via cache de usuários
+        executor = usuarios.get(user_id, '') if user_id else ''
 
+        # Identificar setor via itens da avaliação
+        itens_resp = cf_buscar_itens_avaliacao(eval_id)
         dados = {}
-        if items:
-            items_list = items.get('data', items) if isinstance(items, dict) else items
-            for item in (items_list if isinstance(items_list, list) else []):
-                nome_item = str(item.get('name', '') or item.get('title', '')).strip()
-                resp_item = ''
-                ans = item.get('answer', item.get('response', {}))
-                if isinstance(ans, dict):
-                    resp_item = str(ans.get('text', '') or ans.get('value', '') or ans.get('label', '') or '').strip()
-                elif isinstance(ans, str):
-                    resp_item = ans.strip()
-                if nome_item and resp_item:
-                    dados[nome_item] = resp_item
+        if itens_resp:
+            itens = itens_resp.get('data', itens_resp) if isinstance(itens_resp, dict) else itens_resp
+            if isinstance(itens, list):
+                for item in itens:
+                    nome_item = str(item.get('name', '') or item.get('title', '')).strip()
+                    ans = item.get('answer', item.get('response', {}))
+                    resp_item = ''
+                    if isinstance(ans, dict):
+                        resp_item = str(ans.get('text','') or ans.get('value','') or ans.get('label','')).strip()
+                    elif isinstance(ans, str):
+                        resp_item = ans.strip()
+                    if nome_item and resp_item:
+                        dados[nome_item] = resp_item
 
-        executor = executor_direto
+        # Sobrescrever executor se vier nos itens
         if not executor:
-            for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor', 'Nome do executor']:
+            for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor']:
                 if campo in dados:
                     executor = dados[campo]; break
 
+        if not executor: continue
+
+        # Identificar atividade
         atividade = None
-        for campo in ['Confirme aqui o nome da maquina ou atividade', 'Etapa Auditada', 'Maquina', 'Máquina']:
+        for campo in ['Confirme aqui o nome da maquina ou atividade',
+                      'Etapa Auditada', 'Máquina', 'Maquina']:
             if campo in dados:
                 atividade = dados[campo]; break
 
-        checklist_nome = str(aval.get('checklist', {}).get('name', '') or
-                           aval.get('checklistName', '') or '').upper()
-        setor_key = None
-        if 'B2-03' in checklist_nome or 'APOIO F' in checklist_nome:
-            setor_key = 'B2-03'
-        elif 'B1-01' in checklist_nome or 'CABOS' in checklist_nome or 'PINOS' in checklist_nome:
-            setor_key = 'B1-01'
-        elif 'INJECAO' in checklist_nome or 'INJEC' in checklist_nome or 'PADR' in checklist_nome:
-            setor_key = 'Injecao'
+        # Identificar setor pelo nome do checklist nos itens ou pelo checklistId
+        checklist_nome = ''
+        for campo in ['Checklist', 'Nome do checklist']:
+            if campo in dados:
+                checklist_nome = dados[campo].upper(); break
 
-        if not setor_key or not executor: continue
+        setor_key = None
+        for sk, cfg in SETORES.items():
+            nome_setor = cfg['nome'].upper()
+            if nome_setor in checklist_nome or sk in checklist_nome:
+                setor_key = sk; break
+
+        if not setor_key:
+            # Tentar identificar pelo executor
+            for sk in SETORES:
+                if norm_name(executor, sk):
+                    setor_key = sk; break
+
+        if not setor_key: continue
+
         nome_norm = norm_name(executor, setor_key)
         if not nome_norm: continue
+
         if not atividade:
-            atividade = aval.get('checklist', {}).get('name', 'Sem atividade')
+            atividade = 'Sem atividade informada'
 
         meta = SETORES[setor_key]['colaboradores'].get(nome_norm, 0)
         if data_str not in db[setor_key]:
             db[setor_key][data_str] = {}
         if nome_norm not in db[setor_key][data_str]:
-            db[setor_key][data_str][nome_norm] = {'meta': meta, 'total': 0, 'nc': 0, 'teste': 0, 'inspecoes': [], 'tipos': {}}
+            db[setor_key][data_str][nome_norm] = {
+                'meta': meta, 'total': 0, 'nc': 0, 'teste': 0, 'inspecoes': [], 'tipos': {}
+            }
 
         db[setor_key][data_str][nome_norm]['total'] += 1
         db[setor_key][data_str][nome_norm]['inspecoes'].append({
             'at': atividade, 'ex': nome_norm, 'cf': None, 'tipo': None,
-            'ini': aval.get('startDate'), 'fim': aval.get('endDate'), 'dur': None
+            'ini': aval.get('startedAt'), 'fim': aval.get('concludedAt'), 'dur': None
         })
         setores_atualizados.add(setor_key)
         total_processado += 1
 
     if setores_atualizados:
         save_data(db)
+
     return {'setores': list(setores_atualizados), 'total': total_processado}, None
+
 
 def save_data(data):
     try:
@@ -972,23 +1025,18 @@ def api_cf_sync():
 def api_cf_status():
     if not CF_API_KEY:
         return jsonify({'ok': False, 'erro': 'API key nao configurada (CHECKLISTFACIL_API_KEY)'})
-    from datetime import date
-    hoje = date.today().strftime('%Y-%m-%d')
-    url = f'{CF_API_ANALYTICS}/v1/evaluations'
     try:
-        r = requests.get(url, headers=cf_headers(),
-            params={'status': 6, 'limit': 3, 'page': 1}, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            items = data.get('data', [])
-            sample = items[0] if items else {}
-            return jsonify({
-                'ok': True,
-                'total_amostra': len(items),
-                'campos_disponiveis': list(sample.keys()),
-                'exemplo': sample
-            })
-        return jsonify({'ok': False, 'status': r.status_code, 'body': r.text[:200]})
+        usuarios = cf_carregar_usuarios()
+        from datetime import date
+        hoje = date.today().strftime('%Y-%m-%d')
+        avaliacoes = cf_buscar_avaliacoes(hoje)
+        return jsonify({
+            'ok': True,
+            'usuarios_carregados': len(usuarios),
+            'avaliacoes_hoje': len(avaliacoes) if avaliacoes else 0,
+            'amostra_usuarios': dict(list(usuarios.items())[:5]),
+            'amostra_avaliacoes': avaliacoes[:2] if avaliacoes else []
+        })
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
 
