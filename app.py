@@ -1033,6 +1033,61 @@ loadDB();
 if __name__ == '__main__':
     app.run(debug=True)
 
+@app.route('/api/cf/checklists')
+def api_cf_checklists():
+    if not CF_API_KEY:
+        return jsonify({'erro': 'API key nao configurada'})
+    from datetime import date
+    hoje = date.today().strftime('%Y-%m-%d')
+    try:
+        # Buscar avaliações de hoje
+        r = requests.get(f'{CF_API_ANALYTICS}/v1/evaluations',
+            headers=cf_headers(), params={
+                'startedAt[gte]': f'{hoje}T00:00:00Z',
+                'startedAt[lte]': f'{hoje}T23:59:59Z',
+                'status': 6, 'limit': 200
+            }, timeout=30)
+        if r.status_code != 200:
+            return jsonify({'ok': False, 'status': r.status_code})
+
+        items = r.json().get('data', [])
+        usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
+
+        # Agrupar por checklistId + userId
+        from collections import Counter
+        combos = Counter((i.get('checklistId'), i.get('userId')) for i in items)
+        resultado = []
+        for (cid, uid), count in combos.most_common(30):
+            resultado.append({
+                'checklistId': cid,
+                'userId': uid,
+                'nomeUsuario': usuarios.get(uid, f'userId:{uid}'),
+                'count': count
+            })
+
+        return jsonify({'ok': True, 'hoje': hoje,
+                       'total_avaliacoes': len(items),
+                       'combos_checklist_usuario': resultado})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
+
+def api_cf_checklists():
+    """Lista checklists do Checklist Fácil para identificar IDs."""
+    if not CF_API_KEY:
+        return jsonify({'erro': 'API key nao configurada'})
+    try:
+        r = requests.get(f'{CF_API_ANALYTICS}/v1/checklists',
+            headers=cf_headers(), params={'limit': 100, 'page': 1}, timeout=15)
+        if r.status_code == 200:
+            items = r.json().get('data', [])
+            return jsonify({'ok': True, 'total': len(items),
+                'checklists': [{'id': i.get('checklistId') or i.get('id'),
+                                'nome': i.get('name') or i.get('title', '')} for i in items]})
+        return jsonify({'ok': False, 'status': r.status_code, 'body': r.text[:300]})
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
 @app.route('/api/cf/debug')
 def api_cf_debug():
     if not CF_API_KEY:
