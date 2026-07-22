@@ -166,44 +166,45 @@ def cf_carregar_usuarios():
         return {}
 
 def cf_buscar_avaliacoes(data_str):
-    """Busca avaliações concluídas (status=6) do dia data_str (YYYY-MM-DD)."""
+    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD).
+    A API retorna mais recente primeiro, então página 1 tem os dados de hoje."""
     try:
         url = f'{CF_API_ANALYTICS}/v1/evaluations'
-        # Usar formato ISO completo com timezone
-        params = {
-            'startedAt[gte]': f'{data_str}T00:00:00-03:00',
-            'startedAt[lte]': f'{data_str}T23:59:59-03:00',
-            'status': 6,
-            'limit': 1000,
-            'page': 1,
-        }
         todas = []
         page = 1
-        while True:
-            params['page'] = page
-            r = requests.get(url, headers=cf_headers(), params=params, timeout=30)
+        while page <= 5:  # Máximo 5 páginas = 5000 avaliações recentes
+            r = requests.get(url, headers=cf_headers(),
+                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
             if r.status_code != 200:
-                # Fallback: buscar sem filtro de data e filtrar manualmente
-                r2 = requests.get(url, headers=cf_headers(),
-                    params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
-                if r2.status_code != 200: break
-                items = r2.json().get('data', [])
-                for item in items:
-                    started = str(item.get('startedAt', '') or '')
-                    concluded = str(item.get('concludedAt', '') or '')
-                    if data_str in started or data_str in concluded:
-                        todas.append(item)
-                if len(items) < 1000: break
-                page += 1
-                continue
+                print(f'CF erro {r.status_code} na página {page}')
+                break
             items = r.json().get('data', [])
-            todas.extend(items)
-            if len(items) < 1000: break
+            if not items:
+                break
+            achou_dia = False
+            for item in items:
+                started   = str(item.get('startedAt',   '') or '')[:10]
+                concluded = str(item.get('concludedAt', '') or '')[:10]
+                # Considerar fuso: UTC-3 → data pode ser +1 dia em UTC
+                from datetime import date, timedelta
+                ontem = (date.fromisoformat(data_str) - timedelta(days=1)).strftime('%Y-%m-%d')
+                amanha = (date.fromisoformat(data_str) + timedelta(days=1)).strftime('%Y-%m-%d')
+                if started == data_str or concluded == data_str or started == amanha:
+                    todas.append(item)
+                    achou_dia = True
+            # Se esta página não tem nenhum registro recente, parar
+            if not achou_dia and todas:
+                break
+            # Se todos os itens são mais antigos que data_str, parar
+            primeiros = [str(i.get('startedAt','') or '')[:10] for i in items[:5]]
+            if all(d < ontem for d in primeiros if d):
+                break
             page += 1
         print(f'CF: {len(todas)} avaliações para {data_str}')
         return todas
     except Exception as e:
         print(f'Erro CF avaliacoes: {e}'); return None
+
 
 def cf_buscar_itens_avaliacao(eval_id):
     """Busca os itens/respostas de uma avaliação específica."""
@@ -1017,28 +1018,31 @@ def api_cf_debug():
     hoje = date.today().strftime('%Y-%m-%d')
     ontem = (date.today() - timedelta(days=1)).strftime('%Y-%m-%d')
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    headers = cf_headers()
-    resultados = {}
 
-    # Testar diferentes formatos de filtro de data
-    formatos = {
-        'concludedAt_date':     {'concludedAt[gte]': hoje, 'concludedAt[lte]': hoje, 'limit': 5},
-        'updatedAt_date':       {'updatedAt[gte]': hoje, 'limit': 5},
-        'startedAt_Z':          {'startedAt[gte]': f'{hoje}T00:00:00Z', 'startedAt[lte]': f'{hoje}T23:59:59Z', 'limit': 5},
-        'startedAt_ms':         {'startedAt[gte]': f'{hoje}T00:00:00.000Z', 'limit': 5},
-        'concludedAt_ontem':    {'concludedAt[gte]': ontem, 'concludedAt[lte]': ontem, 'limit': 5},
-        'ultima_pagina':        {'status': 6, 'limit': 10, 'page': 999},
-        'pagina_100':           {'status': 6, 'limit': 10, 'page': 100},
-    }
-
-    for nome, params in formatos.items():
-        try:
-            r = requests.get(url, headers=headers, params=params, timeout=10)
-            data = r.json() if r.status_code == 200 else {}
-            items = data.get('data', [])
-            datas = [i.get('startedAt','')[:10] for i in items]
-            resultados[nome] = {'status': r.status_code, 'count': len(items), 'datas': datas}
-        except Exception as e:
-            resultados[nome] = {'erro': str(e)}
-
-    return jsonify({'ok': True, 'hoje': hoje, 'ontem': ontem, 'resultados': resultados})
+    # Uma única requisição — página 1 tem os dados mais recentes
+    try:
+        r = requests.get(url, headers=cf_headers(),
+            params={'status': 6, 'limit': 20, 'page': 1}, timeout=15)
+        if r.status_code != 200:
+            return jsonify({'ok': False, 'status': r.status_code, 'body': r.text[:200]})
+        items = r.json().get('data', [])
+        amostra = [{'evaluationId': i.get('evaluationId'),
+                    'userId': i.get('userId'),
+                    'startedAt': i.get('startedAt','')[:10],
+                    'concludedAt': i.get('concludedAt','')[:10],
+                    'checklistId': i.get('checklistId')} for i in items]
+        de_hoje = [i for i in items if str(i.get('startedAt','') or '')[:10] == hoje
+                   or str(i.get('concludedAt','') or '')[:10] == hoje]
+        de_ontem = [i for i in items if str(i.get('startedAt','') or '')[:10] == ontem
+                    or str(i.get('concludedAt','') or '')[:10] == ontem]
+        return jsonify({
+            'ok': True,
+            'hoje': hoje,
+            'ontem': ontem,
+            'total_amostra': len(items),
+            'de_hoje': len(de_hoje),
+            'de_ontem': len(de_ontem),
+            'amostra': amostra
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
