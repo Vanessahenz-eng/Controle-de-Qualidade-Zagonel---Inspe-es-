@@ -694,7 +694,9 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#FAFAFA}
     <button class="tab" id="tb1" onclick="gt(1)">Apoio B2-03</button>
     <button class="tab" id="tb2" onclick="gt(2)">Apoio B1-01</button>
     <button class="tab" id="tb3" onclick="gt(3)">Injecao</button>
-    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:auto">Importar</button>
+    <button id="syncbtn" onclick="cfSync()" style="margin-left:auto;padding:7px 14px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">&#8635; Sincronizar</button>
+    <span id="synctxt" style="font-size:11px;color:#718096;padding:0 6px;"></span>
+    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:0">Importar</button>
   </div>
   <div id="p0" class="pg on"><div id="c0"><div class="empty">Carregando...</div></div></div>
   <div id="p1" class="pg"><div id="c1"><div class="empty">Sem dados.</div></div></div>
@@ -919,12 +921,36 @@ async function delDay(sk,dk){
   await loadDB();rDL();
 }
 
+var CF_SYNC_INTERVAL=null;
+async function cfSync(auto){
+  var btn=document.getElementById('syncbtn'),txt=document.getElementById('synctxt');
+  if(btn){btn.disabled=true;btn.textContent='Sincronizando...';}
+  if(txt)txt.textContent='';
+  try{
+    var hoje=new Date();
+    var dk=hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+    var r=await fetch('/api/cf/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:dk})});
+    var d=await r.json();
+    if(d.ok){
+      var res=d.resultado||{};
+      if(txt)txt.textContent=(auto?'Auto: ':'')+' Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' ('+(res.total||0)+' insp)';
+      await loadDB();
+    }else{if(txt)txt.textContent='Erro: '+(d.erro||'falha');}
+  }catch(e){if(txt)txt.textContent='Erro de conexão';}
+  if(btn){btn.disabled=false;btn.textContent='↻ Sincronizar';}
+}
+function iniciarAutoSync(min){
+  if(CF_SYNC_INTERVAL)clearInterval(CF_SYNC_INTERVAL);
+  CF_SYNC_INTERVAL=setInterval(function(){cfSync(true);},min*60*1000);
+}
 async function loadDB(){
   try{
     var r=await fetch('/api/data');DB=await r.json();
+    var rj=await fetch('/api/justificativas');JUST=await rj.json();
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
-    document.getElementById('nfo').textContent=n+' dias registrados';
+    document.getElementById('nfo')).textContent=n+' dias registrados';
     rAll();
+    iniciarAutoSync(5);
   }catch(e){document.getElementById('nfo').textContent='Erro ao carregar';}
 }
 
