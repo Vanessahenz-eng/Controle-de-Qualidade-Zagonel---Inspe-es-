@@ -950,7 +950,6 @@ async function loadDB(){
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
     document.getElementById('nfo')).textContent=n+' dias registrados';
     rAll();
-    iniciarAutoSync(5);
   }catch(e){document.getElementById('nfo').textContent='Erro ao carregar';}
 }
 
