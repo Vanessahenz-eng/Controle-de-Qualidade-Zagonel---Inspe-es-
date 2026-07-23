@@ -11,6 +11,26 @@ UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 CF_API_KEY   = os.environ.get('CHECKLISTFACIL_API_KEY', '')
 CF_API_URL         = 'https://integration.checklistfacil.com.br'
+
+# Mapeamento de nome de usuário CF → setor
+CF_USUARIO_SETOR = {
+    'qualidade injeção 1': 'Injecao',
+    'qualidade injecao 1': 'Injecao',
+    'qualidade injeção 2': 'Injecao',
+    'qualidade injecao 2': 'Injecao',
+    'qualidade injeção 3': 'Injecao',
+    'qualidade injecao 3': 'Injecao',
+    'cq apoio 2':          'B1-01',
+    'cq industrial':       'B2-03',
+}
+
+def cf_usuario_para_setor(nome_usuario):
+    """Retorna o setor correspondente ao usuário do CF."""
+    n = str(nome_usuario or '').lower()
+    for chave, setor in CF_USUARIO_SETOR.items():
+        if chave in n:
+            return setor
+    return None
 CF_API_ANALYTICS   = 'https://api-analytics.checklistfacil.com.br'
 GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 
@@ -261,15 +281,17 @@ def cf_sincronizar_dia(data_str):
     setores_atualizados = set()
 
     for aval in avaliacoes:
-        eval_id   = aval.get('evaluationId')
-        user_id   = aval.get('userId')
-        checklist_id = aval.get('checklistId')
+        eval_id  = aval.get('evaluationId')
+        user_id  = aval.get('userId')
 
-        # Nome do executor via cache de usuários
-        executor = usuarios.get(user_id, '') if user_id else ''
+        # Identificar setor pelo usuário CF
+        nome_usuario_cf = usuarios.get(user_id, '') if user_id else ''
+        setor_key = cf_usuario_para_setor(nome_usuario_cf)
+        if not setor_key:
+            continue
 
-        # Identificar setor via itens da avaliação
-        itens_resp = cf_buscar_itens_avaliacao(eval_id)
+        # Buscar itens da avaliação para obter nome do inspetor e atividade
+        itens_resp = cf_buscar_itens_avaliacao(eval_id) if eval_id else None
         dados = {}
         if itens_resp:
             itens = itens_resp.get('data', itens_resp) if isinstance(itens_resp, dict) else itens_resp
@@ -285,40 +307,21 @@ def cf_sincronizar_dia(data_str):
                     if nome_item and resp_item:
                         dados[nome_item] = resp_item
 
-        # Sobrescrever executor se vier nos itens
+        # Extrair nome do inspetor dos itens
+        executor = None
+        for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor', 'Nome do executor']:
+            if campo in dados:
+                executor = dados[campo]; break
+
         if not executor:
-            for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor']:
-                if campo in dados:
-                    executor = dados[campo]; break
+            continue
 
-        if not executor: continue
-
-        # Identificar atividade
+        # Extrair atividade
         atividade = None
         for campo in ['Confirme aqui o nome da maquina ou atividade',
                       'Etapa Auditada', 'Máquina', 'Maquina']:
             if campo in dados:
                 atividade = dados[campo]; break
-
-        # Identificar setor pelo nome do checklist nos itens ou pelo checklistId
-        checklist_nome = ''
-        for campo in ['Checklist', 'Nome do checklist']:
-            if campo in dados:
-                checklist_nome = dados[campo].upper(); break
-
-        setor_key = None
-        for sk, cfg in SETORES.items():
-            nome_setor = cfg['nome'].upper()
-            if nome_setor in checklist_nome or sk in checklist_nome:
-                setor_key = sk; break
-
-        if not setor_key:
-            # Tentar identificar pelo executor
-            for sk in SETORES:
-                if norm_name(executor, sk):
-                    setor_key = sk; break
-
-        if not setor_key: continue
 
         nome_norm = norm_name(executor, setor_key)
         if not nome_norm: continue
