@@ -945,12 +945,15 @@ function iniciarAutoSync(min){
 }
 async function loadDB(){
   try{
-    var r=await fetch('/api/data');DB=await r.json();
-    var rj=await fetch('/api/justificativas');JUST=await rj.json();
+    var r=await fetch('/api/data');
+    DB=await r.json();
+  }catch(e){document.getElementById('nfo').textContent='Erro dados';return;}
+  try{var rj=await fetch('/api/justificativas');JUST=await rj.json();}catch(e){JUST={};}
+  try{
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
-    document.getElementById('nfo')).textContent=n+' dias registrados';
+    document.getElementById('nfo').textContent=n+' dias registrados';
     rAll();
-  }catch(e){document.getElementById('nfo').textContent='Erro ao carregar';}
+  }catch(e){document.getElementById('nfo').textContent='Erro render';}
 }
 
 loadDB();
