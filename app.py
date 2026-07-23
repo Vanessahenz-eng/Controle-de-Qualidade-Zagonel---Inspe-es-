@@ -9,7 +9,7 @@ app = Flask(__name__)
 DATA_FILE    = 'data.json'
 UPLOAD_KEY   = os.environ.get('UPLOAD_KEY', 'zagonel2026')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
-CF_API_KEY   = os.environ.get('CHECKLISTFACIL_API_KEY', '')
+GITHUB_REPO  = os.environ.get('GITHUB_REPO', '')
 CF_API_URL         = 'https://integration.checklistfacil.com.br'
 
 # Mapeamento de nome de usuário CF → setor
@@ -125,6 +125,93 @@ SETORES = {
     },
 }
 
+
+app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
+
+# Usuários do sistema — senhas configuráveis via variáveis de ambiente no Render
+USUARIOS = {
+    # Admin — acesso total a todos os setores
+    'bruno':    {'senha': os.environ.get('PASS_BRUNO',    'Bruno@2026'),    'nome': 'Bruno',    'setores': ['B2-03','B1-01','Injecao']},
+    # Encarregado — vê todos os setores (somente visualização)
+    'luciano':  {'senha': os.environ.get('PASS_LUCIANO',  'Luciano@2026'),  'nome': 'Luciano',  'setores': ['B2-03','B1-01','Injecao']},
+    # Apoio B2-03
+    'juliana':  {'senha': os.environ.get('PASS_JULIANA',  'Juliana@2026'),  'nome': 'Juliana',  'setores': ['B2-03']},
+    'sirlei':   {'senha': os.environ.get('PASS_SIRLEI',   'Sirlei@2026'),   'nome': 'Sirlei',   'setores': ['B2-03']},
+    'danmari':  {'senha': os.environ.get('PASS_DANMARI',  'Danmari@2026'),  'nome': 'Danmari',  'setores': ['B2-03']},
+    # Apoio B1-01
+    'luana':    {'senha': os.environ.get('PASS_LUANA',    'Luana@2026'),    'nome': 'Luana',    'setores': ['B1-01']},
+    'bruna':    {'senha': os.environ.get('PASS_BRUNA',    'Bruna@2026'),    'nome': 'Bruna',    'setores': ['B1-01']},
+    # Injeção
+    'kaline':   {'senha': os.environ.get('PASS_KALINE',   'Kaline@2026'),   'nome': 'Kaline',   'setores': ['Injecao']},
+    'jocemar':  {'senha': os.environ.get('PASS_JOCEMAR',  'Jocemar@2026'),  'nome': 'Jocemar',  'setores': ['Injecao']},
+    'patricia': {'senha': os.environ.get('PASS_PATRICIA', 'Patricia@2026'), 'nome': 'Patricia', 'setores': ['Injecao']},
+    'tatiana':  {'senha': os.environ.get('PASS_TATIANA',  'Tatiana@2026'),  'nome': 'Tatiana',  'setores': ['Injecao']},
+    'andressa': {'senha': os.environ.get('PASS_ANDRESSA', 'Andressa@2026'), 'nome': 'Andressa', 'setores': ['Injecao']},
+    'kaue':     {'senha': os.environ.get('PASS_KAUE',     'Kaue@2026'),     'nome': 'Kauê',     'setores': ['Injecao']},
+    'renata':   {'senha': os.environ.get('PASS_RENATA',   'Renata@2026'),   'nome': 'Renata',   'setores': ['Injecao']},
+    'raquel':   {'senha': os.environ.get('PASS_RAQUEL',   'Raquel@2026'),   'nome': 'Raquel',   'setores': ['Injecao']},
+}
+
+SETORES = {
+    'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor']},
+    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},
+                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor'],
+                   'campo_atividade': 'Etapa Auditada',
+                   'campo_tipo': 'Etapa Auditada',
+                   'tipo_no_campo_atividade': True,
+                   'tipos_map': {
+                       'completa': 'Inspeção Completa Diária',
+                       'rotina':   'Inspeção de Rotina',
+                       'conferência': 'Conferência e Aprovação de Cabos',
+                       'conferencia': 'Conferência e Aprovação de Cabos',
+                   }},
+    'Injecao': {
+        'nome': 'Injeção', 'cor': '#7C3AED',
+        'campos_executor': ['Executor', 'Nome do inspetor', 'Nome do Inspetor'],
+        'campo_atividade': 'Máquina',
+        'campo_tipo': 'Tipo de inspeção',
+        'tipos_map': {
+            'completa':   'Inspeção Completa Diária',
+            'rotina':     'Inspeção de Rotina',
+            'início':     'Inspeção de Início de Produção',
+            'inicio':     'Inspeção de Início de Produção',
+        },
+
+        'colaboradores': {
+            # Turno 1 — 05:20 às 15:08 — meta 20
+            'Kaline':   20,
+            'Jocemar':  20,
+            'Patricia': 20,
+            # Turno 2 — 15:00 às 00:27 — meta 18
+            'Tatiana':  18,
+            'Andressa': 18,
+            'Kaue':     18,
+            # Turno 3 — 00:12 às 05:48 — meta 11
+            'Renata':   11,
+            'Raquel':   11,
+        },
+        'nomes_map': {
+            'kaline':    'Kaline',
+            'jocemar':   'Jocemar',
+            'patricia':  'Patricia',
+            'patrica':   'Patricia',
+            'tatiana':   'Tatiana',
+            'andressa':  'Andressa',
+            'kaue':      'Kaue',
+            'kau':       'Kaue',
+            'renata':    'Renata',
+            'raquel':    'Raquel',
+        },
+        'campo_tipo': 'Tipo de inspeção',
+        'tipos_map': {
+            'completa':   'Inspeção Completa Diária',
+            'rotina':     'Inspeção de Rotina',
+            'início':     'Inspeção de Início de Produção',
+            'inicio':     'Inspeção de Início de Produção',
+        },
+    },
+}
+
 def load_data():
     local_data = None
     github_data = None
@@ -149,7 +236,6 @@ def load_data():
                     base[setor] = {}
                 base[setor].update(dias)
     return base
-
 
 def cf_headers():
     return {'Authorization': f'Bearer {CF_API_KEY}', 'Content-Type': 'application/json'}
@@ -449,8 +535,8 @@ def parse_xlsx(file_bytes, setor_key):
     for o in by_code.values():
         if not o['at'] and o.get('checklist'):
             o['at'] = o['checklist']
-        # Para Injeção/B1-01: aceitar inspeções sem atividade — registrar como "Sem máquina informada"
-        if setor_key in ('Injecao', 'B1-01') and not o['at'] and o.get('ex'):
+        # Para Injeção: aceitar inspeções sem atividade — registrar como "Sem máquina informada"
+        if setor_key == 'Injecao' and not o['at'] and o.get('ex'):
             o['at'] = 'Sem máquina informada'
 
     inspecoes = []
@@ -608,9 +694,7 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#FAFAFA}
     <button class="tab" id="tb1" onclick="gt(1)">Apoio B2-03</button>
     <button class="tab" id="tb2" onclick="gt(2)">Apoio B1-01</button>
     <button class="tab" id="tb3" onclick="gt(3)">Injecao</button>
-    <button id="syncbtn" onclick="cfSync()" style="margin-left:auto;padding:7px 14px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">&#8635; Sincronizar</button>
-    <span id="synctxt" style="font-size:11px;color:#718096;padding:0 6px;"></span>
-    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:0">Importar</button>
+    <button class="tab" id="ti" onclick="gt(4)" style="margin-left:auto">Importar</button>
   </div>
   <div id="p0" class="pg on"><div id="c0"><div class="empty">Carregando...</div></div></div>
   <div id="p1" class="pg"><div id="c1"><div class="empty">Sem dados.</div></div></div>
@@ -835,48 +919,13 @@ async function delDay(sk,dk){
   await loadDB();rDL();
 }
 
-var JUST={}, TEM_TODOS=true;
-var CF_SYNC_INTERVAL = null;
-
-async function cfSync(auto){
-  var btn=document.getElementById('syncbtn');
-  var txt=document.getElementById('synctxt');
-  if(btn){btn.disabled=true; btn.textContent='Sincronizando...';}
-  if(txt) txt.textContent='';
-  try{
-    var hoje=new Date();
-    var dk=hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
-    var r=await fetch('/api/cf/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:dk})});
-    var d=await r.json();
-    if(d.ok){
-      var res=d.resultado||{};
-      var msg=auto?'Auto: ':'';
-      if(txt) txt.textContent=msg+'Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' ('+( res.total||0)+' insp)';
-      await loadDB();
-    } else {
-      if(txt) txt.textContent='Erro: '+(d.erro||'falha na sincronização');
-    }
-  }catch(e){
-    if(txt) txt.textContent='Erro de conexão';
-  }
-  if(btn){btn.disabled=false; btn.textContent='↻ Sincronizar';}
-}
-
-function iniciarAutoSync(intervalo_min){
-  if(CF_SYNC_INTERVAL) clearInterval(CF_SYNC_INTERVAL);
-  CF_SYNC_INTERVAL=setInterval(function(){ cfSync(true); }, intervalo_min*60*1000);
-}
-
 async function loadDB(){
   try{
     var r=await fetch('/api/data');DB=await r.json();
-    var rj=await fetch('/api/justificativas');JUST=await rj.json();
     var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
     document.getElementById('nfo').textContent=n+' dias registrados';
     rAll();
   }catch(e){document.getElementById('nfo').textContent='Erro ao carregar';}
-  // Iniciar auto-sync a cada 5 minutos
-  iniciarAutoSync(5);
 }
 
 loadDB();
@@ -1033,9 +1082,6 @@ loadDB();
 </body>
 </html>''';
 
-if __name__ == '__main__':
-    app.run(debug=True)
-
 @app.route('/api/cf/checklists')
 def api_cf_checklists():
     if not CF_API_KEY:
@@ -1114,3 +1160,596 @@ def api_cf_debug():
         })
     except Exception as e:
         return jsonify({'ok': False, 'erro': str(e)})
+@app.route('/api/cf/sync', methods=['POST'])
+def api_cf_sync():
+    body = request.get_json() or {}
+    data_str = body.get('data')
+    if not data_str:
+        from datetime import date
+        data_str = date.today().strftime('%Y-%m-%d')
+    resultado, erro = cf_sincronizar_dia(data_str)
+    if erro and not resultado:
+        return jsonify({'ok': False, 'erro': erro}), 400
+    return jsonify({'ok': True, 'resultado': resultado, 'aviso': erro})
+
+@app.route('/api/cf/status')
+def api_cf_status():
+    if not CF_API_KEY:
+        return jsonify({'ok': False, 'erro': 'API key nao configurada (CHECKLISTFACIL_API_KEY)'})
+    from datetime import date
+    hoje = date.today().strftime('%Y-%m-%d')
+    url = f'{CF_API_ANALYTICS}/v1/evaluations'
+    try:
+        r = requests.get(url, headers=cf_headers(), params={
+            'startedAt[gte]': f'{hoje}T00:00:00Z',
+            'startedAt[lte]': f'{hoje}T23:59:59Z',
+            'status': 6, 'limit': 5
+        }, timeout=15)
+        return jsonify({
+            'ok': r.status_code == 200,
+            'status_code': r.status_code,
+            'hoje': hoje,
+            'body': r.json() if r.status_code == 200 else r.text[:300]
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'erro': str(e)})
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+@app.route('/api/me')
+def api_me():
+    if not session.get('usuario'):
+        return jsonify({'error': 'Nao autenticado'}), 401
+    usuario = session.get('usuario', '')
+    info = USUARIOS.get(usuario, {})
+    return jsonify({
+        'nome': info.get('nome', usuario),
+        'setores': info.get('setores', []),
+        'tem_todos': len(info.get('setores', [])) > 1
+    })
+
+@app.route('/api/justificativas')
+def api_justificativas():
+    db = load_data()
+    return jsonify(db.get('justificativas', {}))
+
+@app.route('/api/justificativa', methods=['POST'])
+def api_salvar_justificativa():
+    if not session.get('usuario'):
+        return jsonify({'error': 'Nao autenticado'}), 401
+    data = request.get_json() or {}
+    setor = data.get('setor')
+    colab = data.get('colaborador')
+    dia   = data.get('data')
+    texto = data.get('texto', '').strip()
+    if not all([setor, colab, dia, texto]):
+        return jsonify({'error': 'Dados incompletos'}), 400
+    db = load_data()
+    if 'justificativas' not in db: db['justificativas'] = {}
+    if setor not in db['justificativas']: db['justificativas'][setor] = {}
+    if colab not in db['justificativas'][setor]: db['justificativas'][setor][colab] = {}
+    db['justificativas'][setor][colab][dia] = texto
+    save_data(db)
+    return jsonify({'ok': True})
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+    erro = ''
+    if request.method == 'POST':
+        usuario = request.form.get('usuario','').strip().lower()
+        senha   = request.form.get('senha','').strip()
+        if usuario in USUARIOS and USUARIOS[usuario]['senha'] == senha:
+            session['usuario']  = usuario
+            session['nome']     = USUARIOS[usuario]['nome']
+            session['setores']  = USUARIOS[usuario]['setores']
+            return redirect('/painel')
+        erro = 'Usuário ou senha incorretos.'
+    return Response(get_login_html(erro), mimetype='text/html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+@app.route('/painel')
+def page_painel():
+    if not session.get('usuario'):
+        return redirect('/login')
+    return Response(get_painel_html(
+        session.get('nome',''),
+        session.get('setores', [])
+    ), mimetype='text/html')
+
+@app.route('/monitor')
+def page_monitor():
+    if not session.get('monitor_ok') and not session.get('usuario'):
+        return redirect('/login')
+    return redirect('/painel')
+
+def get_painel_html(nome_usuario, setores_permitidos):
+    SN = {'B2-03':'Apoio B2-03','B1-01':'Apoio B1-01','Injecao':'Injecao'}
+    SC = {'B2-03':'#2563EB','B1-01':'#059669','Injecao':'#7C3AED'}
+    setores_js = str(setores_permitidos).replace("'",'"')
+    sn_js = str({k: SN[k] for k in setores_permitidos if k in SN}).replace("'",'"')
+    sc_js = str({k: SC[k] for k in setores_permitidos if k in SC}).replace("'",'"')
+    tem_todos = len(setores_permitidos) > 1
+    return """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel - Zagonel</title>
+<style>
+:root{--bg:#F0F4F8;--wh:#fff;--bd:#E2E8F0;--tx:#1A202C;--mu:#718096;--gr:#059669;--am:#D97706;--rd:#DC2626;--gr2:#ECFDF5;--am2:#FFFBEB;--rd2:#FEF2F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.top{background:#05B15D;color:#fff;padding:.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:18px;font-weight:700}
+.top p{font-size:11px;opacity:.85;margin-top:2px}
+.main{max-width:1200px;margin:0 auto;padding:1.5rem}
+.tabs{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--bd);background:var(--wh);color:var(--mu)}
+.tab.on{color:#fff;border-color:transparent}
+#tt.on{background:#334155}
+#tb1.on{background:#2563EB}
+#tb2.on{background:#059669}
+#tb3.on{background:#7C3AED}
+.pg{display:none}.pg.on{display:block}
+.dsel{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
+.dsel select{flex:1;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--wh);color:var(--tx);font-family:inherit}
+.sl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.sb{margin-bottom:2rem}
+.sh{display:flex;align-items:center;gap:8px;margin-bottom:1rem}
+.sd{width:12px;height:12px;border-radius:3px}
+.st{font-size:16px;font-weight:700}
+.ss{font-size:12px;color:var(--mu);margin-left:auto}
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
+.kc{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.kl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
+.kv{font-size:24px;font-weight:700}
+.ks{font-size:11px;color:var(--mu);margin-top:.2rem}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--wh);border:1px solid var(--bd);border-radius:12px;padding:1.1rem;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.sv::before{background:var(--gr)}.at::before{background:var(--am)}.no::before{background:var(--rd)}.em::before{background:var(--bd)}
+.cn{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem}
+.cm{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.cp{font-size:38px;font-weight:700;line-height:1;margin-bottom:.15rem}
+.sv .cp{color:var(--gr)}.at .cp{color:var(--am)}.no .cp{color:var(--rd)}.em .cp{color:#CBD5E0}
+.cs{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.bar{height:4px;background:#EDF2F7;border-radius:3px;margin-bottom:.75rem;overflow:hidden}
+.bf{height:4px;border-radius:3px}
+.sv .bf{background:var(--gr)}.at .bf{background:var(--am)}.no .bf{background:var(--rd)}.em .bf{background:#CBD5E0}
+.cst{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bd);padding-top:.6rem}
+.cv{font-size:16px;font-weight:700;text-align:center}
+.cl2{font-size:10px;color:var(--mu);text-align:center;margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:.5rem}
+.sv .pill{background:var(--gr2);color:var(--gr)}.at .pill{background:var(--am2);color:var(--am)}.no .pill{background:var(--rd2);color:var(--rd)}.em .pill{background:#F7FAFC;color:var(--mu)}
+.div{border:none;border-top:1px solid var(--bd);margin:1.5rem 0}
+.empty{text-align:center;padding:3rem;color:var(--mu);font-size:13px}
+.sair{font-size:11px;color:rgba(255,255,255,.85);text-decoration:none;border:1px solid rgba(255,255,255,.4);padding:4px 12px;border-radius:6px}
+.sair:hover{background:rgba(255,255,255,.15)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>Controle de Inspecoes</h1>
+    <p>Ola, """ + nome_usuario + """ &middot; Zagonel Qualidade Industrial</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div id="nfo" style="font-size:12px;opacity:.8">Carregando...</div>
+    <a href="/logout" class="sair">Sair</a>
+  </div>
+</div>
+<div class="main">
+  <div id="content">
+    <div class="tabs" id="tabs"></div>
+    <div id="pg-todos" class="pg on"><div id="c-todos"><div class="empty">Carregando...</div></div></div>
+    <div id="pg-B2-03" class="pg"><div id="c-B2-03"></div></div>
+    <div id="pg-B1-01" class="pg"><div id="c-B1-01"></div></div>
+    <div id="pg-Injecao" class="pg"><div id="c-Injecao"></div></div>
+  </div>
+</div>
+<script>
+var DB={},SK=""" + setores_js + """,SN=""" + sn_js + """,SC=""" + sc_js + """,TEM_TODOS=""" + ('true' if tem_todos else 'false') + """;
+function fD(k){var d=new Date(k+"T12:00:00");return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();}
+function pad(n){return n<10?"0"+n:""+n;}
+function cl(p,t){if(!t)return"em";if(p<85)return"no";if(p<=100)return"at";return"sv";}
+function pt(c){return c==="sv"?"Superou":c==="at"?"Atingiu a meta":c==="no"?"Nao atingiu":"Sem dados";}
+function bCard(nome,d){
+  var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
+  var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
+  var h='<div class="card '+c+'"><div class="cn">'+nome+'</div><div class="cm">Meta: '+meta+' inspecoes/dia</div>';
+  h+='<div class="cp">'+(!tot?"--":pct+"%")+'</div>';
+  h+='<div class="cs">'+(!tot?"Sem registros":tot+" realizadas - meta "+meta)+'</div>';
+  h+='<div class="bar"><div class="bf" style="width:'+(!tot?0:Math.min(pct,100))+'%"></div></div>';
+  h+='<div class="cst"><div><div class="cv">'+tot+'</div><div class="cl2">realizadas</div></div>';
+  h+='<div><div class="cv">'+(tot-nc)+'</div><div class="cl2">conformes</div></div>';
+  h+='<div><div class="cv">'+meta+'</div><div class="cl2">meta</div></div></div>';
+  h+='<span class="pill">'+pt(c)+'</span>';
+  if(d.tipos&&Object.keys(d.tipos).length){
+    h+='<div style="border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;">';
+    Object.entries(d.tipos).sort().forEach(function(e){
+      var lb=e[0].replace("Inspeção ","").replace("de ","").replace("Diária","").replace("Produção","Início Prod.").trim();
+      h+='<div style="display:flex;justify-content:space-between;margin-bottom:2px;"><span style="color:var(--mu)">'+lb+'</span><span style="font-weight:600">'+e[1]+'</span></div>';
+    });
+    h+="</div>";
+  }
+  return h+"</div>";
+}
+function bSetor(sk,dk){
+  var sd=(DB[sk]||{})[dk]||{},col=Object.keys(sd);
+  if(!col.length)return"";
+  var tot=0,meta=0,nc=0,nsv=0,nat=0,nno=0;
+  col.forEach(function(n){var d=sd[n];tot+=d.total;if(d.total>0)meta+=d.meta;nc+=d.nc;var p=d.meta>0?Math.round(d.total/d.meta*100):0,c=cl(p,d.total);if(c==="sv")nsv++;else if(c==="at")nat++;else if(c==="no")nno++;});
+  var pct=meta>0?Math.round(tot/meta*100):0;
+  var h='<div class="sb"><div class="sh"><div class="sd" style="background:'+SC[sk]+'"></div><div class="st">'+SN[sk]+'</div><div class="ss">'+tot+' insp · '+pct+'% meta</div></div>';
+  h+='<div class="kg"><div class="kc"><div class="kl">Inspecoes</div><div class="kv">'+tot+'</div><div class="ks">meta: '+meta+'</div></div>';
+  h+='<div class="kc"><div class="kl">% da meta</div><div class="kv" style="color:'+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd)")+'">'+pct+'%</div></div>';
+  h+='<div class="kc"><div class="kl">Status</div><div class="kv" style="font-size:12px;line-height:1.8;">';
+  if(nsv>0)h+='<span style="color:var(--gr)">'+nsv+' superou</span><br>';
+  if(nat>0)h+='<span style="color:var(--am)">'+nat+' atingiu</span><br>';
+  if(nno>0)h+='<span style="color:var(--rd)">'+nno+' abaixo</span>';
+  h+='</div></div></div><div class="cg">';
+  col.forEach(function(n){h+=bCard(n,sd[n],sk,dk);});
+  return h+"</div></div>";
+}
+function getDias(sk){
+  var dias=[];
+  if(sk==="todos"){SK.forEach(function(s){Object.keys(DB[s]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});}
+  else{dias=Object.keys(DB[sk]||{});}
+  return dias.sort(function(a,b){return b.localeCompare(a);});
+}
+function rTodos(dk){
+  var el=document.getElementById("c-todos");
+  var dias=getDias("todos");
+  if(!dias.length){el.innerHTML='<div class="empty">Nenhum dado importado.</div>';return;}
+  if(!dk)dk=dias[0];
+  var h='<div class="dsel"><span class="sl">Data</span><select id="sel-todos">';
+  dias.forEach(function(d){h+='<option value="'+d+'"'+(d===dk?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-c-todos"></div>';
+  el.innerHTML=h;
+  document.getElementById("sel-todos").addEventListener("change",function(){rTodos(this.value);});
+  var bod="",ok=false;
+  SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){bod+=s;bod+='<div class="div"></div>';ok=true;}});
+  document.getElementById("body-c-todos").innerHTML=ok?bod:'<div class="empty">Sem dados para esta data.</div>';
+}
+function rSetor(sk,dk){
+  var cid="c-"+sk,el=document.getElementById(cid);
+  if(!el)return;
+  var dias=getDias(sk);
+  if(!dias.length){el.innerHTML='<div class="empty">Sem dados para este setor.</div>';return;}
+  if(!dk)dk=dias[0];
+  var h='<div class="dsel"><span class="sl">Data</span><select id="sel-'+sk+'">';
+  dias.forEach(function(d){h+='<option value="'+d+'"'+(d===dk?' selected':'')+'>'+fD(d)+'</option>';});
+  h+='</select></div><div id="body-'+cid+'"></div>';
+  el.innerHTML=h;
+  document.getElementById("sel-"+sk).addEventListener("change",(function(s){return function(){rSetor(s,this.value);};})(sk));
+  document.getElementById("body-"+cid).innerHTML=bSetor(sk,dk)||'<div class="empty">Sem dados para esta data.</div>';
+}
+function goTab(s,btn){
+  document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on");});
+  btn.classList.add("on");
+  document.querySelectorAll(".pg").forEach(function(p){p.classList.remove("on");});
+  document.getElementById("pg-"+s).classList.add("on");
+  if(s==="todos")rTodos();else rSetor(s);
+}
+function buildTabs(){
+  var tabs=document.getElementById("tabs");tabs.innerHTML="";
+  if(TEM_TODOS){
+    var b=document.createElement("button");b.className="tab on";b.id="tt";b.textContent="Todos os setores";
+    b.onclick=function(){goTab("todos",b);};tabs.appendChild(b);
+  }
+  SK.forEach(function(sk,i){
+    var b=document.createElement("button");
+    b.className="tab"+((!TEM_TODOS&&i===0)?" on":"");
+    b.id="tb"+(i+1);b.textContent=SN[sk];
+    b.style.cssText="--sc:"+SC[sk];
+    b.onclick=function(){goTab(sk,b);};
+    b.addEventListener("click",function(){this.style.background=SC[sk];this.style.color="#fff";this.style.borderColor="transparent";});
+    tabs.appendChild(b);
+  });
+}
+var JUST={}, _SK='', _DK='', NOME_INSP='', TEM_TODOS=false;
+
+function getPendentes(){
+  if(TEM_TODOS) return [];
+  var pend=[];
+  try{
+    var limite=new Date(); limite.setDate(limite.getDate()-7);
+    var limiteStr=limite.getFullYear()+'-'+String(limite.getMonth()+1).padStart(2,'0')+'-'+String(limite.getDate()).padStart(2,'0');
+    SK.forEach(function(sk){
+      Object.keys(DB[sk]||{}).forEach(function(dk){
+        if(dk<limiteStr) return;
+        var colab=(DB[sk][dk])||{};
+        if(!colab[NOME_INSP]) return;
+        var d=colab[NOME_INSP];
+        var pct=d.meta>0?Math.round(d.total/d.meta*100):100;
+        if(pct<85){
+          var jatem=JUST[sk]&&JUST[sk][NOME_INSP]&&JUST[sk][NOME_INSP][dk];
+          if(!jatem) pend.push({sk:sk,nome:NOME_INSP,dk:dk,pct:pct,tot:d.total,meta:d.meta});
+        }
+      });
+    });
+  }catch(e){console.error(e);}
+  return pend.sort(function(a,b){return a.dk.localeCompare(b.dk);});
+}
+
+function mostrarBloqueio(pend){
+  var p=pend[0];
+  var nfo=document.getElementById("nfo");
+  if(nfo) nfo.textContent="Justificativa pendente";
+
+  // Criar overlay de justificativa sobre tudo
+  var overlay=document.getElementById("joverlay");
+  if(!overlay){
+    overlay=document.createElement("div");
+    overlay.id="joverlay";
+    overlay.style.cssText="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(240,244,248,.97);z-index:999;display:flex;align-items:center;justify-content:center;";
+    document.body.appendChild(overlay);
+  }
+  var msg=pend.length>1?"<div style='font-size:11px;color:#718096;margin-bottom:1rem;'>Ainda há mais "+(pend.length-1)+" justificativa(s) pendente(s) após esta.</div>":"";
+  overlay.innerHTML=
+    "<div style='max-width:500px;width:90%;background:#fff;border-radius:12px;padding:2rem;border:1px solid #E2E8F0;box-shadow:0 8px 32px rgba(0,0,0,.1);'>"
+    +"<div style='background:#FEF2F2;border-radius:8px;padding:1rem;margin-bottom:1.5rem;'>"
+    +"<div style='font-size:14px;font-weight:700;color:#991B1B;margin-bottom:.4rem;'>Justificativa obrigatória</div>"
+    +"<div style='font-size:13px;color:#7F1D1D;'>Você ficou com <strong>"+p.pct+"%</strong> da meta no dia <strong>"+fD(p.dk)+"</strong><br>("+p.tot+"/"+p.meta+" inspeções realizadas).</div>"
+    +"</div>"
+    +"<div style='font-size:13px;font-weight:700;color:#1A202C;margin-bottom:.5rem;'>Qual o motivo do resultado abaixo de 85%?</div>"
+    +"<textarea id='jtexto' rows='4' placeholder='Descreva o motivo aqui...' style='width:100%;padding:10px;border:1.5px solid #E2E8F0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;outline:none;margin-bottom:.75rem;'></textarea>"
+    +msg
+    +"<button id='jbtn' style='width:100%;padding:12px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;'>Registrar justificativa</button>"
+    +"</div>";
+  document.getElementById("jbtn").onclick=function(){salvarJust(p.sk,p.nome,p.dk);};
+}
+
+async function salvarJust(sk,nome,dk){
+  var texto=document.getElementById("jtexto").value.trim();
+  if(!texto){alert("Por favor, descreva o motivo.");return;}
+  var btn=document.getElementById("jbtn");
+  if(btn){btn.disabled=true;btn.textContent="Salvando...";}
+  try{
+    var r=await fetch("/api/justificativa",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({setor:sk,colaborador:nome,data:dk,texto:texto})});
+    var d=await r.json();
+    if(d.ok){
+      // Atualizar JUST local
+      if(!JUST[sk])JUST[sk]={};
+      if(!JUST[sk][nome])JUST[sk][nome]={};
+      JUST[sk][nome][dk]=texto;
+      // Recarregar justificativas do servidor para garantir persistência
+      try{
+        var r2=await fetch("/api/justificativas");
+        JUST=await r2.json();
+      }catch(e2){}
+      var pend=getPendentes();
+      if(pend.length){
+        mostrarBloqueio(pend);
+      } else {
+        var overlay=document.getElementById("joverlay");
+        if(overlay) overlay.remove();
+        iniciarPainel();
+      }
+    } else {
+      alert("Erro ao salvar: "+(d.error||"tente novamente."));
+      if(btn){btn.disabled=false;btn.textContent="Registrar justificativa";}
+    }
+  }catch(e){
+    alert("Erro de conexão. Tente novamente.");
+    if(btn){btn.disabled=false;btn.textContent="Registrar justificativa";}
+  }
+}
+
+function iniciarPainel(){
+  var overlay=document.getElementById("joverlay");
+  if(overlay) overlay.remove();
+  var n=SK.reduce(function(a,sk){return a+Object.keys(DB[sk]||{}).length;},0);
+  var nfo=document.getElementById("nfo");
+  if(nfo) nfo.textContent=n+" dias registrados";
+  buildTabs();
+  if(TEM_TODOS)rTodos();else if(SK.length)rSetor(SK[0]);
+}
+
+async function loadDB(){
+  try{
+    var rm=await fetch("/api/me"); var me=await rm.json();
+    if(me.error){window.location="/login";return;}
+    NOME_INSP=me.nome;
+    TEM_TODOS=me.tem_todos;
+    SK=me.setores;
+    var r1=await fetch("/api/data"); DB=await r1.json();
+    var r2=await fetch("/api/justificativas"); JUST=await r2.json();
+    var pend=getPendentes();
+    if(pend.length) mostrarBloqueio(pend);
+    else iniciarPainel();
+  }catch(e){
+    console.error("Erro loadDB:",e);
+    var c=document.getElementById("content");
+    if(c) c.innerHTML='<div class="empty">Erro ao carregar dados. Recarregue a página.</div>';
+    var n=document.getElementById("nfo");
+    if(n) n.textContent="Erro ao carregar";
+  }
+}
+loadDB();
+</script>
+</body>
+</html>""";
+
+
+def get_login_html(erro=''):
+    return '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acesso Monitor - Zagonel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:#F0F4F8;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:12px;padding:2.5rem;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.logo{text-align:center;margin-bottom:2rem}
+.logo div{font-size:22px;font-weight:700;color:#05B15D}
+.logo p{font-size:12px;color:#718096;margin-top:4px}
+.fg{margin-bottom:1rem}
+label{display:block;font-size:11px;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem}
+input{width:100%;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:.15s}
+input:focus{border-color:#05B15D}
+.btn{width:100%;padding:12px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:.5rem}
+.btn:hover{background:#047a42}
+.erro{background:#FEF2F2;color:#991B1B;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:1rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">
+    <div>Zagonel</div>
+    <p>Controle de Inspecoes - Monitor</p>
+  </div>
+  ''' + ('<div class="erro">'+ erro +'</div>' if erro else '') + '''
+  <form method="POST">
+    <div class="fg">
+      <label>Usuario</label>
+      <input type="text" name="usuario" placeholder="Digite seu usuario" autofocus required>
+    </div>
+    <div class="fg">
+      <label>Senha</label>
+      <input type="password" name="senha" placeholder="Digite sua senha" required>
+    </div>
+    <button type="submit" class="btn">Entrar</button>
+  </form>
+</div>
+</body>
+</html>'''
+
+def get_monitor_html():
+    return '''<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monitor - Controle de Inspecoes Zagonel</title>
+<style>
+:root{--bg:#F0F4F8;--wh:#fff;--bd:#E2E8F0;--tx:#1A202C;--mu:#718096;--gr:#059669;--am:#D97706;--rd:#DC2626;--gr2:#ECFDF5;--am2:#FFFBEB;--rd2:#FEF2F2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.top{background:#05B15D;color:#fff;padding:.85rem 1.5rem;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:18px;font-weight:700}
+.top p{font-size:11px;opacity:.85;margin-top:2px}
+.main{max-width:1200px;margin:0 auto;padding:1.5rem}
+.dsel{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem}
+.dsel select{flex:1;padding:9px 12px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--wh);color:var(--tx);font-family:inherit}
+.sl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.sb{margin-bottom:2rem}
+.sh{display:flex;align-items:center;gap:8px;margin-bottom:1rem}
+.sd{width:12px;height:12px;border-radius:3px}
+.st{font-size:16px;font-weight:700}
+.ss{font-size:12px;color:var(--mu);margin-left:auto}
+.kg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
+.kc{background:var(--wh);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.kl{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
+.kv{font-size:24px;font-weight:700}
+.ks{font-size:11px;color:var(--mu);margin-top:.2rem}
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--wh);border:1px solid var(--bd);border-radius:12px;padding:1.1rem;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:12px 12px 0 0}
+.sv::before{background:var(--gr)}.at::before{background:var(--am)}.no::before{background:var(--rd)}.em::before{background:var(--bd)}
+.cn{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem}
+.cm{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.cp{font-size:38px;font-weight:700;line-height:1;margin-bottom:.15rem}
+.sv .cp{color:var(--gr)}.at .cp{color:var(--am)}.no .cp{color:var(--rd)}.em .cp{color:#CBD5E0}
+.cs{font-size:11px;color:var(--mu);margin-bottom:.6rem}
+.bar{height:4px;background:#EDF2F7;border-radius:3px;margin-bottom:.75rem;overflow:hidden}
+.bf{height:4px;border-radius:3px}
+.sv .bf{background:var(--gr)}.at .bf{background:var(--am)}.no .bf{background:var(--rd)}.em .bf{background:#CBD5E0}
+.cst{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bd);padding-top:.6rem}
+.cv{font-size:16px;font-weight:700;text-align:center}
+.cl2{font-size:10px;color:var(--mu);text-align:center;margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:.5rem}
+.sv .pill{background:var(--gr2);color:var(--gr)}.at .pill{background:var(--am2);color:var(--am)}.no .pill{background:var(--rd2);color:var(--rd)}.em .pill{background:#F7FAFC;color:var(--mu)}
+.div{border:none;border-top:1px solid var(--bd);margin:1.5rem 0}
+.empty{text-align:center;padding:3rem;color:var(--mu);font-size:13px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div><h1>Monitor de Inspecoes</h1><p>Zagonel - Qualidade Industrial</p></div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div id="nfo" style="font-size:12px;opacity:.8">Carregando...</div>
+    <a href="/logout" style="font-size:11px;color:rgba(255,255,255,.8);text-decoration:none;border:1px solid rgba(255,255,255,.4);padding:4px 10px;border-radius:6px;">Sair</a>
+  </div>
+</div>
+<div class="main">
+  <div id="content"><div class="empty">Carregando dados...</div></div>
+</div>
+<script>
+var DB={},SK=["B2-03","B1-01","Injecao"],SN={"B2-03":"Apoio B2-03","B1-01":"Apoio B1-01","Injecao":"Injecao"},SC={"B2-03":"#2563EB","B1-01":"#059669","Injecao":"#7C3AED"};
+function fD(k){var d=new Date(k+"T12:00:00");return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();}
+function pad(n){return n<10?"0"+n:""+n;}
+function cl(p,t){if(!t)return"em";if(p<85)return"no";if(p<=100)return"at";return"sv";}
+function pt(c){return c==="sv"?"Superou":c==="at"?"Atingiu a meta":c==="no"?"Nao atingiu":"Sem dados";}
+function bCard(nome,d){
+  var tot=d.total||0,meta=d.meta||0,nc=d.nc||0;
+  var pct=meta>0?Math.round(tot/meta*100):0,c=cl(pct,tot);
+  var h="<div class=card "+c+"><div class=cn>"+nome+"</div><div class=cm>Meta: "+meta+" inspecoes/dia</div>";
+  h+="<div class=cp>"+(!tot?"--":pct+"%")+"</div>";
+  h+="<div class=cs>"+(!tot?"Sem registros":tot+" realizadas - meta "+meta)+"</div>";
+  h+="<div class=bar><div class=bf style=width:"+(!tot?0:Math.min(pct,100))+"%></div></div>";
+  h+="<div class=cst><div><div class=cv>"+tot+"</div><div class=cl2>realizadas</div></div>";
+  h+="<div><div class=cv>"+(tot-nc)+"</div><div class=cl2>conformes</div></div>";
+  h+="<div><div class=cv>"+meta+"</div><div class=cl2>meta</div></div></div>";
+  h+="<span class=pill>"+pt(c)+"</span>";
+  if(d.tipos&&Object.keys(d.tipos).length){
+    h+="<div style=border-top:1px solid var(--bd);padding-top:.5rem;margin-top:.5rem;font-size:11px;>";
+    Object.entries(d.tipos).sort().forEach(function(e){
+      var lb=e[0].replace("Inspeção ","").replace("de ","").replace("Diária","").replace("Produção","Início Prod.").trim();
+      h+="<div style=display:flex;justify-content:space-between;margin-bottom:2px;><span style=color:var(--mu)>"+lb+"</span><span style=font-weight:600>"+e[1]+"</span></div>";
+    });
+    h+="</div>";
+  }
+  h+="</div>";return h;
+}
+function bSetor(sk,dk){
+  var sd=(DB[sk]||{})[dk]||{},col=Object.keys(sd);
+  if(!col.length)return"";
+  var tot=0,meta=0,nc=0,nsv=0,nat=0,nno=0;
+  col.forEach(function(n){var d=sd[n];tot+=d.total;if(d.total>0)meta+=d.meta;nc+=d.nc;var p=d.meta>0?Math.round(d.total/d.meta*100):0,c=cl(p,d.total);if(c==="sv")nsv++;else if(c==="at")nat++;else if(c==="no")nno++;});
+  var pct=meta>0?Math.round(tot/meta*100):0;
+  var h="<div class=sb><div class=sh><div class=sd style=background:"+SC[sk]+"></div><div class=st>"+SN[sk]+"</div><div class=ss>"+tot+" insp - "+pct+"% meta</div></div>";
+  h+="<div class=kg><div class=kc><div class=kl>Inspecoes</div><div class=kv>"+tot+"</div><div class=ks>meta: "+meta+"</div></div>";
+  h+="<div class=kc><div class=kl>% da meta</div><div class=kv style=color:"+(pct>=100?"var(--gr)":pct>=85?"var(--am)":"var(--rd);")+">"+pct+"%</div></div>";
+  h+="<div class=kc><div class=kl>Status</div><div class=kv style=font-size:12px;line-height:1.8;>";
+  if(nsv>0)h+="<span style=color:var(--gr)>"+nsv+" superou</span><br>";
+  if(nat>0)h+="<span style=color:var(--am)>"+nat+" atingiu</span><br>";
+  if(nno>0)h+="<span style=color:var(--rd)>"+nno+" abaixo</span>";
+  h+="</div></div></div><div class=cg>";
+  col.forEach(function(n){h+=bCard(n,sd[n],sk,dk);});
+  h+="</div></div>";return h;
+}
+function render(dk){
+  var el=document.getElementById("content"),dias=[];
+  SK.forEach(function(sk){Object.keys(DB[sk]||{}).forEach(function(d){if(dias.indexOf(d)<0)dias.push(d);});});
+  dias.sort(function(a,b){return b.localeCompare(a);});
+  if(!dias.length){el.innerHTML="<div class=empty>Nenhum dado disponivel.</div>";return;}
+  if(!dk)dk=dias[0];
+  var h="<div class=dsel><span class=sl>Data</span><select id=ds onchange=render(this.value)>";
+  dias.forEach(function(d){h+="<option value="+d+(d===dk?" selected":"")+">"+fD(d)+"</option>";});
+  h+="</select></div>";
+  var temDados=false;
+  SK.forEach(function(sk){var s=bSetor(sk,dk);if(s){h+=s;h+="<div class=div></div>";temDados=true;}});
+  if(!temDados)h+="<div class=empty>Sem dados para esta data.</div>";
+  el.innerHTML=h;
+}
+async function loadDB(){
+  try{
+    var r=await fetch("/api/data");DB=await r.json();
+    var n=Object.values(DB).reduce(function(a,s){return a+Object.keys(s).length;},0);
+    document.getElementById("nfo").textContent=n+" dias registrados";
+    render();
+  }catch(e){document.getElementById("nfo").textContent="Erro ao carregar";}
+}
+loadDB();
+</script>
+</body>
+</html>'''
