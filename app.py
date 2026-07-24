@@ -129,88 +129,9 @@ SETORES = {
 app.secret_key = os.environ.get('SECRET_KEY', 'zagonel-secret-2026')
 
 # Usuários do sistema — senhas configuráveis via variáveis de ambiente no Render
-USUARIOS = {
-    # Admin — acesso total a todos os setores
-    'bruno':    {'senha': os.environ.get('PASS_BRUNO',    'Bruno@2026'),    'nome': 'Bruno',    'setores': ['B2-03','B1-01','Injecao']},
-    # Encarregado — vê todos os setores (somente visualização)
-    'luciano':  {'senha': os.environ.get('PASS_LUCIANO',  'Luciano@2026'),  'nome': 'Luciano',  'setores': ['B2-03','B1-01','Injecao']},
-    # Apoio B2-03
-    'juliana':  {'senha': os.environ.get('PASS_JULIANA',  'Juliana@2026'),  'nome': 'Juliana',  'setores': ['B2-03']},
-    'sirlei':   {'senha': os.environ.get('PASS_SIRLEI',   'Sirlei@2026'),   'nome': 'Sirlei',   'setores': ['B2-03']},
-    'danmari':  {'senha': os.environ.get('PASS_DANMARI',  'Danmari@2026'),  'nome': 'Danmari',  'setores': ['B2-03']},
-    # Apoio B1-01
-    'luana':    {'senha': os.environ.get('PASS_LUANA',    'Luana@2026'),    'nome': 'Luana',    'setores': ['B1-01']},
-    'bruna':    {'senha': os.environ.get('PASS_BRUNA',    'Bruna@2026'),    'nome': 'Bruna',    'setores': ['B1-01']},
-    # Injeção
-    'kaline':   {'senha': os.environ.get('PASS_KALINE',   'Kaline@2026'),   'nome': 'Kaline',   'setores': ['Injecao']},
-    'jocemar':  {'senha': os.environ.get('PASS_JOCEMAR',  'Jocemar@2026'),  'nome': 'Jocemar',  'setores': ['Injecao']},
-    'patricia': {'senha': os.environ.get('PASS_PATRICIA', 'Patricia@2026'), 'nome': 'Patricia', 'setores': ['Injecao']},
-    'tatiana':  {'senha': os.environ.get('PASS_TATIANA',  'Tatiana@2026'),  'nome': 'Tatiana',  'setores': ['Injecao']},
-    'andressa': {'senha': os.environ.get('PASS_ANDRESSA', 'Andressa@2026'), 'nome': 'Andressa', 'setores': ['Injecao']},
-    'kaue':     {'senha': os.environ.get('PASS_KAUE',     'Kaue@2026'),     'nome': 'Kauê',     'setores': ['Injecao']},
-    'renata':   {'senha': os.environ.get('PASS_RENATA',   'Renata@2026'),   'nome': 'Renata',   'setores': ['Injecao']},
-    'raquel':   {'senha': os.environ.get('PASS_RAQUEL',   'Raquel@2026'),   'nome': 'Raquel',   'setores': ['Injecao']},
-}
 
-SETORES = {
-    'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29}, 'campos_executor': ['Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor']},
-    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},
-                   'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor'],
-                   'campo_atividade': 'Etapa Auditada',
-                   'campo_tipo': 'Etapa Auditada',
-                   'tipo_no_campo_atividade': True,
-                   'tipos_map': {
-                       'completa': 'Inspeção Completa Diária',
-                       'rotina':   'Inspeção de Rotina',
-                       'conferência': 'Conferência e Aprovação de Cabos',
-                       'conferencia': 'Conferência e Aprovação de Cabos',
-                   }},
-    'Injecao': {
-        'nome': 'Injeção', 'cor': '#7C3AED',
-        'campos_executor': ['Executor', 'Nome do inspetor', 'Nome do Inspetor'],
-        'campo_atividade': 'Máquina',
-        'campo_tipo': 'Tipo de inspeção',
-        'tipos_map': {
-            'completa':   'Inspeção Completa Diária',
-            'rotina':     'Inspeção de Rotina',
-            'início':     'Inspeção de Início de Produção',
-            'inicio':     'Inspeção de Início de Produção',
-        },
 
-        'colaboradores': {
-            # Turno 1 — 05:20 às 15:08 — meta 20
-            'Kaline':   20,
-            'Jocemar':  20,
-            'Patricia': 20,
-            # Turno 2 — 15:00 às 00:27 — meta 18
-            'Tatiana':  18,
-            'Andressa': 18,
-            'Kaue':     18,
-            # Turno 3 — 00:12 às 05:48 — meta 11
-            'Renata':   11,
-            'Raquel':   11,
-        },
-        'nomes_map': {
-            'kaline':    'Kaline',
-            'jocemar':   'Jocemar',
-            'patricia':  'Patricia',
-            'patrica':   'Patricia',
-            'tatiana':   'Tatiana',
-            'andressa':  'Andressa',
-            'kaue':      'Kaue',
-            'kau':       'Kaue',
-            'renata':    'Renata',
-            'raquel':    'Raquel',
-        },
-        'campo_tipo': 'Tipo de inspeção',
-        'tipos_map': {
-            'completa':   'Inspeção Completa Diária',
-            'rotina':     'Inspeção de Rotina',
-            'início':     'Inspeção de Início de Produção',
-            'inicio':     'Inspeção de Início de Produção',
-        },
-    },
-}
+
 
 def load_data():
     local_data = None
