@@ -193,67 +193,37 @@ def cf_carregar_usuarios():
         return {}
 
 def cf_buscar_avaliacoes(data_str):
-    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD)."""
+    """Busca avaliações concluídas do dia data_str (YYYY-MM-DD) — uma única requisição."""
     import time
     url = f'{CF_API_ANALYTICS}/v1/evaluations'
-    headers = cf_headers()
-
-    # Formatos de data a tentar (do mais provável ao menos provável)
-    formatos_data = [
-        {'startedAt[gte]': f'{data_str}T00:00:00Z',
-         'startedAt[lte]': f'{data_str}T23:59:59Z'},
-        {'startedAt[gte]': f'{data_str}T03:00:00Z',   # Meia noite Brasil em UTC
-         'startedAt[lte]': f'{data_str}T26:59:59Z'},
-        {'concludedAt[gte]': f'{data_str}T00:00:00Z',
-         'concludedAt[lte]': f'{data_str}T23:59:59Z'},
-    ]
-
-    for fmt in formatos_data:
-        try:
-            params = {'status': 6, 'limit': 1000, 'page': 1}
-            params.update(fmt)
-            r = requests.get(url, headers=headers, params=params, timeout=30)
-            if r.status_code == 200:
-                items = r.json().get('data', [])
-                print(f'CF: {len(items)} avaliacoes para {data_str} (formato: {list(fmt.keys())[0]})')
-                return items
-            if r.status_code == 429:
-                print(f'CF rate limit (429) - aguardando...')
-                time.sleep(5)
-                r2 = requests.get(url, headers=headers, params=params, timeout=30)
-                if r2.status_code == 200:
-                    items = r2.json().get('data', [])
-                    print(f'CF: {len(items)} avaliacoes (retry ok)')
-                    return items
-        except Exception as e:
-            print(f'Erro CF formato {fmt}: {e}')
-            continue
-
-    # Último recurso: buscar sem filtro e filtrar manualmente por páginas
-    print('CF: usando fallback sem filtro de data')
     todas = []
-    for page in range(1, 10):
+    page = 1
+    while page <= 10:
         try:
-            r = requests.get(url, headers=headers,
-                params={'status': 6, 'limit': 1000, 'page': page}, timeout=30)
-            if r.status_code != 200: break
-            items = r.json().get('data', [])
-            if not items: break
-            for item in items:
-                started = str(item.get('startedAt', '') or '')[:10]
-                concluded = str(item.get('concludedAt', '') or '')[:10]
-                if started == data_str or concluded == data_str:
-                    todas.append(item)
-            # Parar se a página mais recente não tem o dia procurado e já vimos dias posteriores
-            datas_pagina = [str(i.get('startedAt','') or '')[:10] for i in items]
-            if any(d > data_str for d in datas_pagina) and not todas:
+            r = requests.get(url, headers=cf_headers(), params={
+                'startedAt[gte]': f'{data_str}T00:00:00Z',
+                'startedAt[lte]': f'{data_str}T23:59:59Z',
+                'status': 6,
+                'limit': 1000,
+                'page': page,
+            }, timeout=30)
+            if r.status_code == 429:
+                time.sleep(10)
+                continue
+            if r.status_code != 200:
+                print(f'CF erro {r.status_code}: {r.text[:200]}')
                 break
-            if len(items) < 1000: break
-            time.sleep(1)  # Evitar rate limit
+            data = r.json()
+            items = data.get('data', [])
+            todas.extend(items)
+            if not data.get('meta', {}).get('hasMore', False):
+                break
+            page += 1
         except Exception as e:
-            print(f'Erro CF pagina {page}: {e}'); break
-    print(f'CF fallback: {len(todas)} avaliacoes para {data_str}')
-    return todas if todas else None
+            print(f'Erro CF p{page}: {e}')
+            break
+    print(f'CF: {len(todas)} avaliacoes para {data_str}')
+    return todas if todas is not None else None
 
 
 def cf_buscar_itens_avaliacao(eval_id):
@@ -270,34 +240,48 @@ def cf_buscar_itens_avaliacao(eval_id):
     return None
 
 def cf_sincronizar_dia(data_str):
-    """Sincroniza avaliações do Checklist Fácil para data_str (YYYY-MM-DD)."""
+    """Sincroniza avaliações do dia data_str com rate limit respeitado."""
+    import time
     if not CF_API_KEY:
         return None, 'CHECKLISTFACIL_API_KEY nao configurada'
 
-    # Carregar mapa de usuários
+    # Carregar usuários
     usuarios = _cf_users_cache if _cf_users_cache else cf_carregar_usuarios()
+    if not usuarios:
+        return None, 'Nao foi possivel carregar usuarios do Checklist Facil'
 
+    # Buscar avaliações do dia
     avaliacoes = cf_buscar_avaliacoes(data_str)
     if avaliacoes is None:
         return None, 'Erro ao acessar API do Checklist Facil'
     if not avaliacoes:
         return {}, f'Nenhuma avaliacao encontrada para {data_str}'
 
+    # Filtrar apenas avaliações dos nossos setores pelo nome do usuário
+    avaliacoes_setor = []
+    for aval in avaliacoes:
+        uid = aval.get('userId')
+        nome_usuario = usuarios.get(uid, '')
+        setor = cf_usuario_para_setor(nome_usuario)
+        if setor:
+            aval['_setor'] = setor
+            avaliacoes_setor.append(aval)
+
+    if not avaliacoes_setor:
+        return {}, f'Nenhuma avaliacao dos setores reconhecidos em {data_str}'
+
+    print(f'CF: {len(avaliacoes_setor)} avaliacoes dos setores para {data_str}')
+
     db = load_data()
     total_processado = 0
     setores_atualizados = set()
 
-    for aval in avaliacoes:
+    for aval in avaliacoes_setor:
         eval_id  = aval.get('evaluationId')
-        user_id  = aval.get('userId')
-
-        # Identificar setor pelo usuário CF
-        nome_usuario_cf = usuarios.get(user_id, '') if user_id else ''
-        setor_key = cf_usuario_para_setor(nome_usuario_cf)
-        if not setor_key:
-            continue
+        setor_key = aval['_setor']
 
         # Buscar itens da avaliação para obter nome do inspetor e atividade
+        time.sleep(0.5)  # Respeitar rate limit
         itens_resp = cf_buscar_itens_avaliacao(eval_id) if eval_id else None
         dados = {}
         if itens_resp:
@@ -314,13 +298,16 @@ def cf_sincronizar_dia(data_str):
                     if nome_item and resp_item:
                         dados[nome_item] = resp_item
 
-        # Extrair nome do inspetor dos itens
+        # Extrair nome do inspetor
         executor = None
-        for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor', 'Nome do executor']:
+        for campo in ['Nome do Inspetor', 'Nome do inspetor', 'Executor']:
             if campo in dados:
                 executor = dados[campo]; break
-
         if not executor:
+            continue
+
+        nome_norm = norm_name(executor, setor_key)
+        if not nome_norm:
             continue
 
         # Extrair atividade
@@ -329,10 +316,6 @@ def cf_sincronizar_dia(data_str):
                       'Etapa Auditada', 'Máquina', 'Maquina']:
             if campo in dados:
                 atividade = dados[campo]; break
-
-        nome_norm = norm_name(executor, setor_key)
-        if not nome_norm: continue
-
         if not atividade:
             atividade = 'Sem atividade informada'
 
@@ -343,7 +326,6 @@ def cf_sincronizar_dia(data_str):
             db[setor_key][data_str][nome_norm] = {
                 'meta': meta, 'total': 0, 'nc': 0, 'teste': 0, 'inspecoes': [], 'tipos': {}
             }
-
         db[setor_key][data_str][nome_norm]['total'] += 1
         db[setor_key][data_str][nome_norm]['inspecoes'].append({
             'at': atividade, 'ex': nome_norm, 'cf': None, 'tipo': None,
