@@ -50,6 +50,7 @@ USUARIOS = {
     # Apoio B1-01
     'luana':    {'senha': os.environ.get('PASS_LUANA',    'Luana@2026'),    'nome': 'Luana',    'setores': ['B1-01']},
     'bruna':    {'senha': os.environ.get('PASS_BRUNA',    'Bruna@2026'),    'nome': 'Bruna',    'setores': ['B1-01']},
+    'valeria':  {'senha': os.environ.get('PASS_VALERIA',  'Valeria@2026'),  'nome': 'Valeria',  'setores': ['B1-01']},
     # Injeção
     'kaline':   {'senha': os.environ.get('PASS_KALINE',   'Kaline@2026'),   'nome': 'Kaline',   'setores': ['Injecao']},
     'jocemar':  {'senha': os.environ.get('PASS_JOCEMAR',  'Jocemar@2026'),  'nome': 'Jocemar',  'setores': ['Injecao']},
@@ -64,7 +65,7 @@ USUARIOS = {
 
 SETORES = {
     'B2-03':   {'nome': 'Apoio B2-03', 'cor': '#2563EB', 'colaboradores': {'Juliana': 30, 'Sirlei': 30, 'Danmari': 29, 'Maria': 29}, 'campos_executor': ['Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor']},
-    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27},
+    'B1-01':   {'nome': 'Apoio B1-01', 'cor': '#059669', 'colaboradores': {'Luana': 28, 'Bruna': 27, 'Valeria': 28},
                    'campos_executor': ['Responsável pela conferência', 'Executor', 'Executor do teste', 'Nome do Inspetor', 'Nome do inspetor'],
                    'campo_atividade': 'Etapa Auditada',
                    'campo_tipo': 'Etapa Auditada',
@@ -366,21 +367,28 @@ def save_data(data):
                     break
             except: pass
 
+def _strip_accents(s):
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                   if unicodedata.category(c) != 'Mn')
+
 def norm_name(n, setor_key):
     if not n: return None
     s = str(n).strip()
     setor = SETORES[setor_key]
     # Para Injeção: usar mapa de nomes completos → nome curto
     if setor_key == 'Injecao':
-        s_lower = s.lower().replace('ê','e').replace('á','a').replace('ã','a')
+        s_lower = _strip_accents(s.lower())
         nomes_map = setor.get('nomes_map', {})
         for chave, nome_curto in nomes_map.items():
-            if chave in s_lower:
+            if _strip_accents(chave) in s_lower:
                 return nome_curto
         return None
-    # Para outros setores: verificar se nome do colaborador está na string
+    # Para outros setores: comparar sem acentos
+    s_norm = _strip_accents(s.lower())
     for nome in setor.get('colaboradores', {}):
-        if nome.lower() in s.lower(): return nome
+        if _strip_accents(nome.lower()) in s_norm:
+            return nome
     return None
 
 def get_meta(nome, setor_key):
