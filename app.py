@@ -607,12 +607,14 @@ tr:last-child td{border-bottom:none}tr:nth-child(even) td{background:#FAFAFA}
     <button class="tab" id="tb3" onclick="gt(3)">Injecao</button>
     <button id="syncbtn" onclick="cfSync()" style="margin-left:auto;padding:7px 14px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">&#8635; Sincronizar</button>
     <span id="synctxt" style="font-size:11px;color:#718096;padding:0 6px;"></span>
+    <button class="tab" id="tr" onclick="gt(5)" style="margin-left:0">Relatorio</button>
     <button class="tab" id="ti" onclick="gt(4)" style="margin-left:0">Importar</button>
   </div>
   <div id="p0" class="pg on"><div id="c0"><div class="empty">Carregando...</div></div></div>
   <div id="p1" class="pg"><div id="c1"><div class="empty">Sem dados.</div></div></div>
   <div id="p2" class="pg"><div id="c2"><div class="empty">Sem dados.</div></div></div>
   <div id="p3" class="pg"><div id="c3"><div class="empty">Sem dados.</div></div></div>
+  <div id="p5" class="pg"><div id="c5"></div></div>
   <div id="p4" class="pg">
     <div class="uf">
       <h3>Importar planilha diaria</h3>
@@ -636,15 +638,16 @@ var DB = {};
 var SK = ['B2-03','B1-01','Injecao'];
 var SN = {'B2-03':'Apoio B2-03','B1-01':'Apoio B1-01','Injecao':'Injecao'};
 var SC = {'B2-03':'#2563EB','B1-01':'#059669','Injecao':'#7C3AED'};
-var TIDS = ['tt','tb1','tb2','tb3','ti'];
+var TIDS = ['tt','tb1','tb2','tb3','tr','ti'];
 
 function gt(n) {
   TIDS.forEach(function(id){ document.getElementById(id).classList.remove('on'); });
   document.getElementById(TIDS[n]).classList.add('on');
-  for(var i=0;i<=4;i++) document.getElementById('p'+i).classList.remove('on');
+  for(var i=0;i<=5;i++){ var p=document.getElementById('p'+i); if(p) p.classList.remove('on'); }
   document.getElementById('p'+n).classList.add('on');
   if(n===0) rAll();
   else if(n>=1 && n<=3) rS(SK[n-1],n);
+  else if(n===4) renderRelatorio();
   else rDL();
 }
 
@@ -832,7 +835,7 @@ async function delDay(sk,dk){
   await loadDB();rDL();
 }
 
-var CF_SYNC_INTERVAL=null;
+var JUST={}, TEM_TODOS=true, CF_SYNC_INTERVAL=null;
 async function cfSync(auto){
   var btn=document.getElementById('syncbtn'),txt=document.getElementById('synctxt');
   if(btn){btn.disabled=true;btn.textContent='Sincronizando...';}
@@ -854,6 +857,151 @@ function iniciarAutoSync(min){
   if(CF_SYNC_INTERVAL)clearInterval(CF_SYNC_INTERVAL);
   CF_SYNC_INTERVAL=setInterval(function(){cfSync(true);},min*60*1000);
 }
+function renderRelatorio(){
+  var el=document.getElementById('c5');
+  if(!el) return;
+
+  // Controles de filtro
+  var meses={}, setores=['B2-03','B1-01','Injecao'], nomeSetores={'B2-03':'Apoio B2-03','B1-01':'Apoio B1-01','Injecao':'Injecao'};
+  setores.forEach(function(sk){
+    Object.keys(DB[sk]||{}).forEach(function(dk){
+      var m=dk.substring(0,7);
+      meses[m]=(meses[m]||0)+1;
+    });
+  });
+  var mesesOrdenados=Object.keys(meses).sort().reverse();
+
+  var h='<div style="background:#fff;border-radius:12px;padding:1.5rem;border:1px solid var(--bd);margin-bottom:1.5rem;">';
+  h+='<h2 style="font-size:16px;font-weight:700;margin-bottom:1rem;">Relatório Acumulado</h2>';
+  h+='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">';
+  h+='<div><label style="font-size:11px;font-weight:700;color:var(--mu);display:block;margin-bottom:4px;">SETOR</label>';
+  h+='<select id="rSetor" style="padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:13px;font-family:inherit;">';
+  h+='<option value="todos">Todos os setores</option>';
+  setores.forEach(function(sk){ h+='<option value="'+sk+'">'+nomeSetores[sk]+'</option>'; });
+  h+='</select></div>';
+  h+='<div><label style="font-size:11px;font-weight:700;color:var(--mu);display:block;margin-bottom:4px;">PERÍODO</label>';
+  h+='<select id="rPeriodo" style="padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:13px;font-family:inherit;">';
+  mesesOrdenados.forEach(function(m){
+    var partes=m.split('-'), nomes=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    h+='<option value="'+m+'">'+nomes[parseInt(partes[1])]+'/'+partes[0]+'</option>';
+  });
+  h+='<option value="personalizado">Personalizado</option>';
+  h+='</select></div>';
+  h+='<div id="rDatasDiv" style="display:none;gap:8px;">';
+  h+='<div><label style="font-size:11px;font-weight:700;color:var(--mu);display:block;margin-bottom:4px;">DE</label>';
+  h+='<input type="date" id="rDe" style="padding:8px;border:1px solid var(--bd);border-radius:8px;font-size:13px;"></div>';
+  h+='<div><label style="font-size:11px;font-weight:700;color:var(--mu);display:block;margin-bottom:4px;">ATÉ</label>';
+  h+='<input type="date" id="rAte" style="padding:8px;border:1px solid var(--bd);border-radius:8px;font-size:13px;"></div>';
+  h+='</div>';
+  h+='<button onclick="calcRelatorio()" style="padding:9px 20px;background:#05B15D;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Calcular</button>';
+  h+='</div></div>';
+  h+='<div id="rResultado"></div>';
+  el.innerHTML=h;
+
+  document.getElementById('rPeriodo').addEventListener('change',function(){
+    document.getElementById('rDatasDiv').style.display=this.value==='personalizado'?'flex':'none';
+  });
+  calcRelatorio();
+}
+
+function calcRelatorio(){
+  var setor=document.getElementById('rSetor').value;
+  var periodo=document.getElementById('rPeriodo').value;
+  var setores=setor==='todos'?['B2-03','B1-01','Injecao']:[setor];
+  var nomeSetores={'B2-03':'Apoio B2-03','B1-01':'Apoio B1-01','Injecao':'Injecao'};
+
+  // Determinar intervalo de datas
+  var de='', ate='';
+  if(periodo==='personalizado'){
+    de=document.getElementById('rDe').value;
+    ate=document.getElementById('rAte').value;
+  } else {
+    de=periodo+'-01'; ate=periodo+'-31';
+  }
+
+  // Agregar dados
+  var agregado={};
+  setores.forEach(function(sk){
+    Object.keys(DB[sk]||{}).sort().forEach(function(dk){
+      if(dk<de||dk>ate) return;
+      var colab=DB[sk][dk];
+      Object.keys(colab).forEach(function(nome){
+        var key=sk+'|'+nome;
+        if(!agregado[key]) agregado[key]={sk:sk,nome:nome,total:0,meta_dia:colab[nome].meta,dias:0,nc:0};
+        agregado[key].total+=colab[nome].total||0;
+        agregado[key].nc+=colab[nome].nc||0;
+        agregado[key].dias+=1;
+      });
+    });
+  });
+
+  if(!Object.keys(agregado).length){
+    document.getElementById('rResultado').innerHTML='<div style="text-align:center;padding:3rem;color:var(--mu);">Nenhum dado para o período selecionado.</div>';
+    return;
+  }
+
+  // Agrupar por setor
+  var porSetor={};
+  Object.values(agregado).forEach(function(d){
+    if(!porSetor[d.sk]) porSetor[d.sk]=[];
+    porSetor[d.sk].push(d);
+  });
+
+  var h='';
+  Object.keys(porSetor).forEach(function(sk){
+    var corSetor={'B2-03':'#2563EB','B1-01':'#059669','Injecao':'#7C3AED'}[sk]||'#666';
+    var lista=porSetor[sk].sort(function(a,b){return b.total-a.total;});
+    var totGeral=lista.reduce(function(s,d){return s+d.total;},0);
+    var metaGeral=lista.reduce(function(s,d){return s+d.meta_dia*d.dias;},0);
+    var pctGeral=metaGeral>0?Math.round(totGeral/metaGeral*100):0;
+    var diasMax=Math.max.apply(null,lista.map(function(d){return d.dias;}));
+
+    h+='<div style="background:#fff;border-radius:12px;border:1px solid var(--bd);margin-bottom:1.5rem;overflow:hidden;">';
+    h+='<div style="background:'+corSetor+';padding:1rem 1.5rem;color:#fff;display:flex;justify-content:space-between;align-items:center;">';
+    h+='<div style="font-size:15px;font-weight:700;">'+nomeSetores[sk]+'</div>';
+    h+='<div style="font-size:13px;opacity:.9;">'+diasMax+' dias | '+totGeral+' inspeções | '+pctGeral+'% da meta</div>';
+    h+='</div>';
+    h+='<table style="width:100%;border-collapse:collapse;">';
+    h+='<thead><tr style="background:#F8FAFC;border-bottom:1px solid var(--bd);">';
+    h+='<th style="padding:10px 16px;text-align:left;font-size:11px;color:var(--mu);font-weight:700;">COLABORADOR</th>';
+    h+='<th style="padding:10px;text-align:center;font-size:11px;color:var(--mu);font-weight:700;">DIAS</th>';
+    h+='<th style="padding:10px;text-align:center;font-size:11px;color:var(--mu);font-weight:700;">REALIZADO</th>';
+    h+='<th style="padding:10px;text-align:center;font-size:11px;color:var(--mu);font-weight:700;">META</th>';
+    h+='<th style="padding:10px;text-align:center;font-size:11px;color:var(--mu);font-weight:700;">% META</th>';
+    h+='<th style="padding:10px;text-align:center;font-size:11px;color:var(--mu);font-weight:700;">MÉDIA/DIA</th>';
+    h+='</tr></thead><tbody>';
+
+    lista.forEach(function(d){
+      var meta=d.meta_dia*d.dias;
+      var pct=meta>0?Math.round(d.total/meta*100):0;
+      var media=d.dias>0?Math.round(d.total/d.dias*10)/10:0;
+      var cor=pct>=100?'var(--gr)':pct>=85?'var(--am)':'var(--rd)';
+      h+='<tr style="border-bottom:1px solid var(--bd);">';
+      h+='<td style="padding:12px 16px;font-weight:600;">'+d.nome+'</td>';
+      h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+d.dias+'</td>';
+      h+='<td style="padding:12px;text-align:center;font-weight:700;">'+d.total+'</td>';
+      h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+meta+'</td>';
+      h+='<td style="padding:12px;text-align:center;font-weight:700;color:'+cor+';">'+pct+'%</td>';
+      h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+media+'</td>';
+      h+='</tr>';
+    });
+
+    // Linha de total
+    h+='<tr style="background:#F8FAFC;font-weight:700;border-top:2px solid var(--bd);">';
+    h+='<td style="padding:12px 16px;">TOTAL</td>';
+    h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+diasMax+'</td>';
+    h+='<td style="padding:12px;text-align:center;">'+totGeral+'</td>';
+    h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+metaGeral+'</td>';
+    var corTotal=pctGeral>=100?'var(--gr)':pctGeral>=85?'var(--am)':'var(--rd)';
+    h+='<td style="padding:12px;text-align:center;color:'+corTotal+';">'+pctGeral+'%</td>';
+    h+='<td style="padding:12px;text-align:center;color:var(--mu);">'+(diasMax>0?Math.round(totGeral/diasMax*10)/10:0)+'</td>';
+    h+='</tr></tbody></table></div>';
+  });
+
+  document.getElementById('rResultado').innerHTML=h;
+}
+
+
 async function loadDB(){
   try{
     var r=await fetch('/api/data');
